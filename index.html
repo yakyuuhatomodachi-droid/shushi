@@ -1,0 +1,2281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アクア農園 収支管理</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #EEF3EF;
+    --surface: #FFFFFF;
+    --border: #CFDCD3;
+    --text-primary: #1F2A24;
+    --text-secondary: #5B6A61;
+    --accent: #2E6B4E;
+    --accent-light: #E1EEE6;
+    --gold: #A8741A;
+    --gold-light: #F6EBD7;
+    --danger: #A9432E;
+    --danger-light: #F5E4DF;
+    --inc: #2E7D57;
+    --exp: #B4472F;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Zen Kaku Gothic New', -apple-system, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+    border-top: 6px solid var(--accent);
+  }
+  .app { max-width: 1400px; margin: 0 auto; padding: 24px 24px 60px; }
+  .app-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .app-header h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+  .app-header p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  #refresh-data-btn { flex-shrink: 0; white-space: nowrap; }
+  #refresh-data-btn.is-loading { opacity: 0.6; pointer-events: none; }
+  .demo-banner { background: var(--gold-light); color: #6B4A0F; border: 1px solid #E5CFA4; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 14px; display: none; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab-btn {
+    appearance: none; border: none; background: none; font-family: inherit; font-size: 15px; font-weight: 500;
+    color: var(--text-secondary); padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; white-space: nowrap;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text-primary); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; font-weight: 700; margin: 0 0 14px; }
+  .hint { font-size: 12px; color: var(--text-secondary); }
+
+  .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .field { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--text-secondary); }
+  .field input, .field select, .cell-input, .cell-select {
+    font-family: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--bg); color: var(--text-primary); width: 100%;
+  }
+  .field input:focus, .field select:focus, .cell-input:focus, .cell-select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .cell-input, .cell-select { padding: 6px 8px; font-size: 14px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .amount-input { font-size: 20px !important; font-weight: 700; }
+
+  .btn { font-family: inherit; font-size: 14px; font-weight: 500; padding: 9px 16px; border-radius: 6px; border: none; cursor: pointer; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #245740; }
+  .btn-ghost { font-family: inherit; font-size: 13px; padding: 6px 12px; border-radius: 6px; background: none; border: 1px solid var(--border); color: var(--text-primary); cursor: pointer; }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--text-secondary); }
+  .btn-ghost:disabled { opacity: 0.3; cursor: default; }
+  .btn-ghost.btn-danger { color: var(--danger); border-color: var(--danger); }
+  .btn-ghost.btn-danger:hover { background: var(--danger); color: #fff; }
+  .btn-text { background: none; border: none; color: var(--accent); font-size: 13px; cursor: pointer; padding: 4px 8px; font-family: inherit; }
+  .btn-text:hover { text-decoration: underline; }
+  .btn-text-danger { background: none; border: none; color: var(--danger); font-size: 13px; cursor: pointer; padding: 4px 8px; font-family: inherit; }
+  .btn-text-danger:hover { text-decoration: underline; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .error-text { color: var(--danger); font-size: 12px; margin: -4px 0 8px; display: none; }
+  .error-text.show { display: block; }
+  .empty-state { text-align: center; padding: 26px 10px; color: var(--text-secondary); font-size: 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-size: 12px; color: var(--text-secondary); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .row-actions { white-space: nowrap; text-align: right; }
+
+  .seg { display: inline-flex; border: 1px solid var(--accent); border-radius: 8px; overflow: hidden; margin-bottom: 14px; flex-wrap: wrap; }
+  .seg-btn { font-family: inherit; font-size: 14px; font-weight: 500; padding: 8px 20px; border: none; background: var(--surface); color: var(--accent); cursor: pointer; }
+  .seg-btn.active { background: var(--accent); color: #fff; }
+  #e-type { border-color: var(--border); }
+  #e-type .seg-btn[data-type="expense"] { color: var(--exp); }
+  #e-type .seg-btn[data-type="income"] { color: var(--inc); }
+  #e-type .seg-btn[data-type="expense"].active { background: var(--exp); color: #fff; }
+  #e-type .seg-btn[data-type="income"].active { background: var(--inc); color: #fff; }
+
+  /* 固定表示つきの表(見出し行・先頭列・合計列) */
+  .scroll-wrap { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; }
+  .fixed-table { border-collapse: separate; border-spacing: 0; font-size: 13px; width: max-content; min-width: 100%; table-layout: fixed; }
+  .fixed-table th, .fixed-table td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 6px 10px; white-space: nowrap; background: var(--surface); text-align: center; overflow: hidden; text-overflow: ellipsis; }
+  .fixed-table th.num, .fixed-table td.num { text-align: right; }
+  .fixed-table td.left { text-align: left; }
+  .fixed-table thead th { position: sticky; top: 0; z-index: 3; background: var(--bg); }
+  .fixed-table .col-first { position: sticky; left: 0; z-index: 2; }
+  .fixed-table thead .col-first { z-index: 5; }
+  .fixed-table .col-last { position: sticky; right: 0; z-index: 2; background: var(--gold-light); font-weight: 700; }
+  .fixed-table thead .col-last { z-index: 5; background: var(--gold-light); }
+  .fixed-table tfoot td { position: sticky; bottom: 0; z-index: 3; font-weight: 700; background: var(--bg); }
+  .fixed-table tfoot td.col-first { z-index: 5; }
+  .fixed-table tfoot td.col-last { z-index: 5; background: var(--gold-light); }
+  .fixed-table tr.row-strong td { font-weight: 700; background: var(--accent-light); }
+  .fixed-table tr.row-strong td.col-last { background: var(--gold-light); }
+  .fixed-table tr.row-sub td.col-first { color: var(--text-secondary); text-align: left; padding-left: 20px; }
+  .fixed-table tr.row-net td { font-weight: 700; background: var(--bg); }
+  .fixed-table td.inc { color: var(--inc); }
+  .fixed-table td.exp { color: var(--exp); }
+  .fixed-table td.neg { color: var(--danger); }
+  .fixed-table td.sun { color: var(--danger); }
+  .fixed-table td.sat { color: #2F6FD0; }
+  .fixed-table tr.clickable { cursor: pointer; }
+  .fixed-table tr.clickable:hover td { background: var(--accent-light); }
+
+  .tag { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-right: 6px; vertical-align: 1px; }
+  .tag.inc { background: #DDF0E5; color: var(--inc); }
+  .tag.exp { background: var(--danger-light); color: var(--exp); }
+
+  :root { --c-inc: #3A9468; --c-exp: #D06A4F; }
+  .chart-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .chart svg { width: 100%; height: auto; display: block; }
+  .chart .grid { stroke: var(--border); stroke-width: 1; }
+  .chart .axis-label { font-size: 11px; fill: var(--text-secondary); }
+  .chart .band:hover { fill: rgba(30, 40, 51, 0.05); }
+  .chart-tip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; line-height: 1.6; box-shadow: 0 2px 8px rgba(0,0,0,0.12); z-index: 4500; display: none; white-space: nowrap; }
+  .chart-tip .t { font-weight: 700; }
+  .chart-tip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .bar-label { width: 120px; font-size: 13px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { flex: 1; background: var(--bg); border-radius: 4px; height: 18px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 0 4px 4px 0; }
+  .bar-value { width: 140px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .bar-value .hint { margin-left: 4px; }
+  .zoom-control { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .zoom-control span { font-size: 13px; min-width: 42px; text-align: center; }
+
+  .stat-grid { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0 0; }
+  .stat-box { flex: 1; min-width: 140px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .stat-box .stat-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .stat-box .stat-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-box.inc .stat-value { color: var(--inc); }
+  .stat-box.exp .stat-value { color: var(--exp); }
+  .stat-box.net .stat-value { color: var(--accent); }
+  .stat-box.net.minus .stat-value { color: var(--danger); }
+
+  .nav-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .nav-row h2 { margin: 0; text-align: center; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(30, 40, 51, 0.45); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+  .modal-box { background: var(--surface); border-radius: var(--radius); width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; padding: 20px; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+  .modal-close { background: none; border: none; font-size: 22px; line-height: 1; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; }
+  .detail-table td { padding: 8px 4px; }
+  .pp-sec { font-size: 12px; color: var(--text-secondary); margin: 10px 0 4px; }
+  .pp-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; font-family: inherit; font-size: 15px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-primary); cursor: pointer; margin-bottom: 6px; }
+  .pp-item:hover, .pp-item.current { border-color: var(--accent); background: var(--accent-light); }
+  .pp-item .pp-sub { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50%; }
+  .detail-table td:first-child { width: 90px; color: var(--text-secondary); font-size: 13px; }
+
+  .password-gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 2000; }
+  .password-gate-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px 28px; max-width: 320px; width: 100%; text-align: center; }
+  .password-gate-box h2 { font-size: 16px; font-weight: 700; margin: 0 0 16px; }
+  .password-gate-box input { width: 100%; font-family: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); margin-bottom: 10px; }
+  .password-gate-box button { width: 100%; }
+
+  .toast { position: fixed; right: 16px; bottom: 16px; background: var(--text-primary); color: #fff; font-size: 13px; padding: 10px 14px; border-radius: 8px; z-index: 4000; opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; max-width: 80vw; }
+  .toast.show { opacity: 0.94; transform: translateY(0); }
+
+  .master-table td { padding: 6px 6px; }
+  .master-table .cell-input.ratio { width: 72px; }
+  .master-table .cell-input.name { min-width: 130px; }
+  .master-table tr.hidden-row td { opacity: 0.55; }
+
+  /* ===== 印刷(A4 1枚) ===== */
+  #print-area { display: none; }
+  .rp { font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif; color: #222; background: #fff; }
+  .rp-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #2E6B4E; padding-bottom: 4px; margin-bottom: 8px; }
+  .rp-title { font-size: 20px; font-weight: 700; }
+  .rp-sub { font-size: 11px; color: #555; text-align: right; }
+  .rp-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .rp-box { flex: 1 1 auto; min-width: 70px; border: 1px solid #ccc; border-radius: 4px; padding: 4px 8px; }
+  .rp-box .l { font-size: 10px; color: #555; }
+  .rp-box .v { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rp-box.inc .v { color: #2E7D57; } .rp-box.exp .v { color: #B4472F; } .rp-box.net .v { color: #2E6B4E; }
+  .rp-section { font-size: 12px; font-weight: 700; margin: 8px 0 4px; }
+  .rp-table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+  .rp-table th, .rp-table td { border: 1px solid #bbb; padding: 2px 5px; white-space: nowrap; text-align: center; }
+  .rp-table th { background: #E3EEE7; font-weight: 500; }
+  .rp-table td.num, .rp-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rp-table td.left { text-align: left; }
+  .rp-table tr.strong td { font-weight: 700; background: #EEF5F0; }
+  .rp-table tr.sub td:first-child { color: #555; text-align: left; padding-left: 12px; }
+  .rp-table tr.total td { font-weight: 700; background: #E3EEE7; }
+  .rp-table .neg { color: #A9432E; }
+  .rp .chart .axis-label { font-size: 10px; }
+  .rp-note { font-size: 10px; color: #555; margin-top: 6px; }
+  @media print {
+    body { background: #fff !important; border-top: none; }
+    body > *:not(#print-area) { display: none !important; }
+    #print-area { display: block !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  @media (max-width: 600px) {
+    .app { padding: 16px 12px 40px; }
+    .app-header { flex-direction: column; align-items: stretch; }
+    #refresh-data-btn { align-self: flex-start; }
+    .card { padding: 14px; }
+    .tab-btn { padding: 10px 10px; font-size: 14px; }
+    .seg-btn { padding: 8px 14px; }
+    .bar-label { width: 90px; }
+    .bar-value { width: 110px; }
+  }
+</style>
+</head>
+<body>
+<div class="password-gate" id="password-gate">
+  <div class="password-gate-box">
+    <h2>合言葉を入力してください</h2>
+    <input type="password" id="password-gate-input" placeholder="合言葉" autocomplete="off">
+    <div class="error-text" id="password-gate-error">合言葉が違います</div>
+    <button class="btn btn-primary" id="password-gate-submit">入る</button>
+  </div>
+</div>
+
+<div class="app">
+  <div class="app-header">
+    <div>
+      <h1>アクア農園 収支管理</h1>
+      <p>農園のお金の出入りを記録し、確定申告用の集計まで出します</p>
+    </div>
+    <button type="button" class="btn-ghost" id="refresh-data-btn">↻ 最新に更新</button>
+  </div>
+  <div class="demo-banner" id="demo-banner">お試しモードです。データはこの端末の中だけに保存されます(スプレッドシートにつなぐと本番になります)。</div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="input">入力・明細</button>
+    <button class="tab-btn" data-tab="summary">集計</button>
+    <button class="tab-btn" data-tab="master">マスタ</button>
+  </div>
+
+  <!-- 入力・明細 -->
+  <div class="panel active" id="panel-input">
+    <div class="card" id="setup-card" style="display:none;">
+      <h2>はじめに</h2>
+      <p class="hint" style="margin-top:0;">科目(お金の分類)を自動で作れませんでした。通信状況を確かめて、下のボタンを押してください。名前や並び順はあとからマスタで変えられます。</p>
+      <button class="btn btn-primary" id="setup-default-btn">科目と支払い方法を作成する</button>
+    </div>
+    <div class="card">
+      <h2 id="e-heading">お金の出入りを記録</h2>
+      <div class="seg" id="e-type">
+        <button type="button" class="seg-btn active" data-type="expense">支出(経費)</button>
+        <button type="button" class="seg-btn" data-type="income">収入</button>
+      </div>
+      <div class="form-row">
+        <div class="field" style="max-width:200px;"><label for="e-date">日付</label><input id="e-date" type="date"></div>
+        <div class="field" style="min-width:200px;"><label for="e-cat">科目</label><select id="e-cat"></select></div>
+        <div class="field" style="max-width:220px;"><label for="e-amount">金額(税込・円)</label><input id="e-amount" class="num amount-input" type="number" inputmode="numeric" step="1" placeholder="0"></div>
+        <div class="field" style="max-width:200px;"><label for="e-method" id="e-method-label">支払い方法</label><select id="e-method"></select></div>
+      </div>
+      <div class="hint" id="e-cat-hint" style="margin:-4px 0 10px;"></div>
+      <div class="form-row">
+        <div class="field"><label for="e-payee">取引先・お店</label>
+          <div style="display:flex; gap:6px;">
+            <input id="e-payee" type="text" list="payee-list" autocomplete="off" placeholder="名前を入力" style="flex:1; min-width:0;">
+            <button type="button" class="btn-ghost" id="e-payee-pick" style="white-space:nowrap; flex-shrink:0;">一覧から選ぶ</button>
+          </div>
+        </div>
+        <div class="field" style="min-width:220px;"><label for="e-memo">メモ</label><input id="e-memo" type="text" placeholder="例: 液肥A 20L×2"></div>
+      </div>
+      <datalist id="payee-list"></datalist>
+      <div class="hint" id="e-payee-hint" style="margin:-4px 0 10px;"></div>
+      <div class="error-text" id="e-error"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="e-submit">記録する</button>
+        <button class="btn-ghost" id="e-cancel" style="display:none;">編集をやめる</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="nav-row">
+        <button class="btn-ghost" id="l-prev">← 前月</button>
+        <h2 id="l-title"></h2>
+        <button class="btn-ghost" id="l-next">次月 →</button>
+      </div>
+      <div class="btn-row"><button class="btn-text" id="l-jump" style="display:none;">今月に戻る</button><button class="btn-ghost" id="l-freee" style="margin-left:auto;">⬇ freee用CSV(この月)</button><button class="btn-ghost" id="l-print">🖨 この月を印刷(A4)</button></div>
+      <div class="stat-grid" id="l-stats" style="margin-bottom:14px;"></div>
+      <div class="form-row" style="align-items:flex-end;">
+        <div class="field" style="max-width:150px;"><label for="lf-type">区分</label><select id="lf-type"><option value="">すべて</option><option value="income">収入だけ</option><option value="expense">支出だけ</option></select></div>
+        <div class="field" style="max-width:220px;"><label for="lf-cat">科目</label><select id="lf-cat"></select></div>
+        <div class="field" style="max-width:180px;"><label for="lf-method">支払い方法</label><select id="lf-method"></select></div>
+        <div class="field" style="max-width:240px;"><label for="lf-q">取引先・メモで探す</label><input id="lf-q" type="search" placeholder="例: 電気"></div>
+      </div>
+      <div class="btn-row" style="margin:6px 0 10px;">
+        <span class="hint">行を押すと詳しく見られます(直す・複製・削除)</span>
+        <div class="zoom-control">
+          <button type="button" class="btn-ghost zoom-out">−</button><span class="zoom-label">100%</span><button type="button" class="btn-ghost zoom-in">＋</button><button type="button" class="btn-text zoom-reset">リセット</button>
+        </div>
+      </div>
+      <div class="scroll-wrap"><div class="zoom-target" id="l-table"></div></div>
+    </div>
+  </div>
+
+  <!-- 集計 -->
+  <div class="panel" id="panel-summary">
+    <div class="seg" id="a-mode">
+      <button type="button" class="seg-btn active" data-view="month">月別</button>
+      <button type="button" class="seg-btn" data-view="category">科目別</button>
+      <button type="button" class="seg-btn" data-view="method">支払い方法別</button>
+      <button type="button" class="seg-btn" data-view="partner">取引先別</button>
+      <button type="button" class="seg-btn" data-view="tax">確定申告用</button>
+    </div>
+    <div class="card">
+      <div class="nav-row">
+        <button class="btn-ghost" id="y-prev">← 前の年</button>
+        <h2 id="y-title"></h2>
+        <button class="btn-ghost" id="y-next">次の年 →</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn-ghost" id="y-csv">⬇ この年の明細をCSVで保存</button>
+        <button class="btn-ghost" id="y-freee">⬇ freee用CSV(この年)</button>
+        <button class="btn-ghost" id="y-print" style="margin-left:auto;">🖨 印刷(A4)</button>
+      </div>
+      <div class="stat-grid" id="y-stats"></div>
+    </div>
+
+    <div id="view-month">
+      <div class="card"><h2>月ごとの収入と支出</h2><div id="m-chart"></div></div>
+      <div class="card">
+        <div class="btn-row" style="margin-bottom:10px;">
+          <span class="hint">金額が入っている科目だけを表示しています</span>
+          <div class="zoom-control">
+            <button type="button" class="btn-ghost zoom-out">−</button><span class="zoom-label">100%</span><button type="button" class="btn-ghost zoom-in">＋</button><button type="button" class="btn-text zoom-reset">リセット</button>
+          </div>
+        </div>
+        <div class="scroll-wrap"><div class="zoom-target" id="m-table"></div></div>
+      </div>
+    </div>
+
+    <div id="view-category" style="display:none;">
+      <div class="card">
+        <div class="form-row"><div class="field" style="max-width:220px;"><label for="c-month">対象</label><select id="c-month"></select></div></div>
+        <h2>支出の内訳</h2>
+        <div id="c-exp"></div>
+        <h2 style="margin-top:20px;">収入の内訳</h2>
+        <div id="c-inc"></div>
+      </div>
+    </div>
+
+    <div id="view-method" style="display:none;">
+      <div class="card">
+        <div class="form-row"><div class="field" style="max-width:220px;"><label for="p-month">対象</label><select id="p-month"></select></div></div>
+        <h2>支払い方法ごとの出入り</h2>
+        <div class="scroll-wrap" style="max-height:none;"><div class="zoom-target" id="p-table"></div></div>
+        <h2 style="margin-top:20px;">支出の支払い方法</h2>
+        <div id="p-chart"></div>
+      </div>
+      <div class="card">
+        <h2>月ごとの支出(支払い方法別)</h2>
+        <div class="scroll-wrap"><div class="zoom-target" id="p-month-table"></div></div>
+      </div>
+    </div>
+
+    <div id="view-partner" style="display:none;">
+      <div class="card">
+        <div class="form-row"><div class="field" style="max-width:220px;"><label for="g-month">対象</label><select id="g-month"></select></div></div>
+        <h2>取引先ごとの出入り</h2>
+        <div class="scroll-wrap"><div class="zoom-target" id="g-table"></div></div>
+        <h2 style="margin-top:20px;">支払いが多い取引先</h2>
+        <div id="g-exp"></div>
+        <h2 style="margin-top:20px;">売上が多い取引先</h2>
+        <div id="g-inc"></div>
+      </div>
+    </div>
+
+    <div id="view-tax" style="display:none;">
+      <div class="card">
+        <h2>確定申告用の集計(青色申告決算書・農業所得用の科目ごと)</h2>
+        <p class="hint" style="margin-top:0;">マスタで「事業で使う割合」を決めた科目(例: 電気代を家と共用している)は、その割合をかけた金額を「申告に使う額」に出しています。</p>
+        <div class="scroll-wrap" style="max-height:none;"><div class="zoom-target" id="t-table"></div></div>
+        <p class="hint" style="margin-bottom:0;">あくまで帳簿の合計です。減価償却費・棚卸(年末の在庫)・青色申告特別控除などは、申告のときに別途計算が必要です。迷うところは税務署や税理士さんに確認してください。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- マスタ -->
+  <div class="panel" id="panel-master">
+    <div class="card">
+      <h2>取引先</h2>
+      <p class="hint" style="margin-top:0;">よく使うお店や出荷先を登録しておくと、入力欄で選ぶだけで「よく使う科目」と「支払い方法」が自動で入ります。</p>
+      <div class="form-row" style="align-items:flex-end;">
+        <div class="field" style="max-width:240px;"><label for="mp-q">名前で探す</label><input id="mp-q" type="search" placeholder="例: JA"></div>
+      </div>
+      <div id="ms-partner"></div>
+      <div class="form-row" style="margin-top:14px; align-items:flex-end;">
+        <div class="field" style="max-width:220px;"><label for="mp-name">新しい取引先</label><input id="mp-name" type="text" placeholder="例: JAくま、○○ホームセンター"></div>
+        <div class="field" style="max-width:220px;"><label for="mp-cat">よく使う科目</label><select id="mp-cat"></select></div>
+        <div class="field" style="max-width:170px;"><label for="mp-method">支払い方法</label><select id="mp-method"></select></div>
+        <div class="field" style="max-width:220px;"><label for="mp-memo">メモ</label><input id="mp-memo" type="text" placeholder="例: 毎月25日引き落とし"></div>
+        <button type="button" class="btn btn-primary" id="mp-add">+ 追加</button>
+      </div>
+      <div class="btn-row"><button type="button" class="btn-text" id="mp-import" style="display:none;"></button></div>
+      <div style="border-top:1px solid var(--border); margin-top:14px; padding-top:14px;">
+        <div class="btn-row">
+          <button type="button" class="btn-ghost" id="mp-nouka-btn">販売管理から取引先を取り込む</button>
+          <input type="file" id="mp-nouka-input" accept="application/json,.json" style="display:none;">
+        </div>
+        <p class="hint" style="margin-bottom:0;">販売管理アプリのマスタで「バックアップをダウンロード」したファイル(nouka-backup_日付.json)を選んでください。まだ登録していない取引先だけを追加します。何度取り込んでも重複しません(販売管理で名前を変えた取引先は、こちらの名前も変わります)。</p>
+      </div>
+    </div>
+    <div class="card">
+      <h2>支出(経費)の科目</h2>
+      <div id="ms-expense"></div>
+    </div>
+    <div class="card">
+      <h2>収入の科目</h2>
+      <div id="ms-income"></div>
+    </div>
+    <div class="card">
+      <h2>支払い方法</h2>
+      <p class="hint" style="margin-top:0;">お金を払った(受け取った)方法です。入力欄で選べるようになり、方法ごとの合計も集計で見られます。</p>
+      <div id="ms-method"></div>
+      <div class="form-row" style="margin-top:14px; align-items:flex-end;">
+        <div class="field" style="max-width:260px;"><label for="mm-name">新しい支払い方法</label><input id="mm-name" type="text" placeholder="例: 肥後銀行、JAカード、楽天カード"></div>
+        <button type="button" class="btn btn-primary" id="mm-add">+ 追加</button>
+        <button type="button" class="btn-ghost" id="mm-default" style="display:none;">よく使う4つをまとめて作成</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>科目を追加</h2>
+      <div class="form-row" style="align-items:flex-end;">
+        <div class="field" style="max-width:130px;"><label for="mn-type">区分</label><select id="mn-type"><option value="expense">支出</option><option value="income">収入</option></select></div>
+        <div class="field" style="max-width:220px;"><label for="mn-name">科目の名前</label><input id="mn-name" type="text" placeholder="例: 車両費、ガソリン代"></div>
+        <div class="field" style="max-width:230px;"><label for="mn-line">確定申告での科目</label><select id="mn-line"></select></div>
+        <div class="field" style="max-width:140px;"><label for="mn-ratio">事業で使う割合(%)</label><input id="mn-ratio" type="number" inputmode="numeric" min="0" max="100" value="100"></div>
+        <button type="button" class="btn btn-primary" id="mn-add">+ 追加</button>
+      </div>
+      <p class="hint">細かく分けたいときは、同じ「確定申告での科目」に複数の科目をつなげられます(例:「液肥」と「培養液」をどちらも「肥料費」に)。</p>
+      <div class="btn-row"><button type="button" class="btn-ghost" id="mn-recommend">おすすめの科目を戻す</button><span class="hint">最初に入っていた科目のうち、消したものをもう一度追加します</span></div>
+    </div>
+    <div class="card" id="freee-card">
+      <h2>freee用CSVの設定</h2>
+      <p class="hint" style="margin-top:0;">「freee用CSV」ボタンで、freee会計の「取引データのインポート」にそのまま入れられる形で書き出します。freeeの勘定科目・税区分・口座の名前と合わせておいてください(名前が合わないと、freeeの取り込み画面でエラーになります)。</p>
+      <div class="form-row" style="align-items:flex-end;">
+        <div class="field" style="max-width:240px;"><label for="fr-enc">文字コード</label><select id="fr-enc"><option value="utf8">UTF-8(Mac・スマホ・Googleスプレッドシート)</option><option value="sjis">Shift_JIS(WindowsのExcel)</option></select></div>
+      </div>
+      <h3 style="font-size:14px; margin:14px 0 6px;">科目 → freeeの勘定科目・税区分</h3>
+      <div id="fr-cats"></div>
+      <h3 style="font-size:14px; margin:16px 0 6px;">支払い方法 → freeeの口座</h3>
+      <div id="fr-methods"></div>
+      <datalist id="fr-tax-list">
+        <option value="課税売上8%（軽）"><option value="課税売上10%"><option value="課対仕入10%"><option value="課対仕入8%（軽）"><option value="非課売上"><option value="非課仕入"><option value="対象外">
+      </datalist>
+      <p class="hint" style="margin-bottom:0;">・支払い方法が「未設定」の記録は、freeeでは「未決済」の取引として入ります。<br>・金額はそのまま(税込)で書き出します。家と共用している費用の「事業割合」は、freeeの家事按分で設定してください。<br>・freeeは取り込んだ取引をすべて新しい取引として登録します。同じ期間を2回取り込むと重複するので注意してください。</p>
+    </div>
+    <div class="card">
+      <h2>年の区切り</h2>
+      <div class="form-row" style="align-items:flex-end;">
+        <div class="field" style="max-width:200px;"><label for="set-fy">年の始まりの月</label><select id="set-fy"></select></div>
+        <span class="hint" style="margin-bottom:8px;">個人の確定申告は1月〜12月です。会社にしたときは決算月に合わせて変えてください。</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>バックアップ・復元</h2>
+      <p class="hint" style="margin-top:0;">すべてのデータを1つのファイルに保存できます。</p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="backup-download-btn">バックアップをダウンロード</button>
+        <button type="button" class="btn-ghost" id="backup-restore-btn">バックアップから復元</button>
+        <input type="file" id="backup-restore-input" accept="application/json,.json" style="display:none;">
+      </div>
+    </div>
+    <div class="card">
+      <h2>ログアウト</h2>
+      <p class="hint" style="margin-top:0;">この端末に保存された合言葉を消します。共用の端末で使ったときに押してください。</p>
+      <button type="button" class="btn-ghost" id="logout-btn">ログアウト</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="chart-tip" id="chart-tip"></div>
+<div id="print-area"></div>
+<style id="page-style">@page { size: A4 portrait; margin: 8mm; }</style>
+
+<div class="modal-overlay" id="detail-modal" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header"><h3 id="detail-title"></h3><button class="modal-close" data-close="detail-modal" aria-label="閉じる">×</button></div>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="partner-pick-modal" style="display:none;">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header"><h3>取引先を選ぶ</h3><button class="modal-close" data-close="partner-pick-modal" aria-label="閉じる">×</button></div>
+    <input id="pp-q" type="search" class="cell-input" placeholder="名前で探す" autocomplete="off" style="width:100%; font-size:15px; padding:8px 10px; margin-bottom:10px;">
+    <div id="pp-list"></div>
+    <div class="btn-row" style="margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+      <button type="button" class="btn-text" id="pp-clear">取引先を入れない</button>
+      <button type="button" class="btn-text" id="pp-master" style="margin-left:auto;">取引先を登録・編集する</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="save-status-modal" style="display:none; z-index:3500;">
+  <div class="modal-box" style="max-width: 360px; text-align: center;">
+    <div id="save-status-icon" style="font-size: 32px; margin-bottom: 10px;"></div>
+    <div id="save-status-message" style="font-size: 15px;"></div>
+    <button class="btn btn-primary" id="save-status-ok" style="margin-top: 16px; width: 100%;">OK</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="progress-modal" style="display:none; z-index:3600;">
+  <div class="modal-box" style="max-width: 360px; text-align: center;">
+    <div style="font-size:15px; font-weight:700; margin-bottom:8px;">保存しています</div>
+    <div id="progress-message" style="font-size:14px;"></div>
+    <div class="hint" style="margin-top:8px;">終わるまで画面を閉じないでください</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="confirm-modal" style="display:none; z-index:3000;">
+  <div class="modal-box">
+    <div class="modal-header"><h3>確認</h3></div>
+    <div id="confirm-modal-message" style="white-space:pre-wrap;"></div>
+    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+      <button class="btn-ghost" id="confirm-modal-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="confirm-modal-ok">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 設定 =====
+// Googleスプレッドシート側(GAS)のウェブアプリURLをここに貼り付けます
+// (貼り付けるまでは「お試しモード」で動き、データはこの端末の中だけに保存されます)
+const SHEET_API_URL = '__YOUR_GAS_WEB_APP_URL__';
+const DEMO = SHEET_API_URL.indexOf('__YOUR') === 0;
+
+// 販売管理・無人販売アプリとブラウザ保存が混ざらないよう、専用の名前を使う
+const PASSWORD_STORAGE_KEY = 'shushi_pw';
+const CACHE_KEY = 'shushi_cache_v1';
+const ZOOM_KEY = 'shushi_zoom';
+const APP_NAME = 'アクア農園収支管理';
+
+// 青色申告決算書(農業所得用)の科目と並び順
+const REPORT_LINES = {
+  income: ['販売金額', '家事消費・事業消費金額', '雑収入'],
+  expense: ['租税公課', '種苗費', '素畜費', '肥料費', '飼料費', '農具費', '農薬・衛生費', '諸材料費', '修繕費', '動力光熱費',
+    '作業用衣料費', '農業共済掛金', '減価償却費', '荷造運賃手数料', '雇人費', '利子割引料', '地代・賃借料', '土地改良費', '貸倒金',
+    '通信費', '消耗品費', '支払手数料', '広告宣伝費', '車両費', '旅費交通費', '研修費', '会費', '保険料', '接待交際費', '雑費']
+};
+// 最初に作る科目
+const DEFAULT_CATEGORIES = [
+  // 収入
+  { type: 'income', name: '販売(取引先への出荷)', line: '販売金額', hint: 'スーパー・飲食店などへの出荷。販売管理アプリの売上' },
+  { type: 'income', name: '無人販売', line: '販売金額', hint: '無人販売所・幸福駅など' },
+  { type: 'income', name: '移動販売', line: '販売金額', hint: 'マルシェ・イベントなど' },
+  { type: 'income', name: '直売・ネット販売', line: '販売金額', hint: '農園での直売・通販' },
+  { type: 'income', name: '家事消費', line: '家事消費・事業消費金額', hint: '自分の家で食べた分・人にあげた分' },
+  { type: 'income', name: '補助金・交付金', line: '雑収入', hint: '経営開始資金・各種補助金など' },
+  { type: 'income', name: '共済金・保険金', line: '雑収入', hint: '農業共済・収入保険の支払い' },
+  { type: 'income', name: '雑収入', line: '雑収入', hint: '作業の手伝い・資材の売却など' },
+  // 支出
+  { type: 'expense', name: '租税公課', line: '租税公課', hint: '固定資産税・自動車税・印紙など' },
+  { type: 'expense', name: '種苗費', line: '種苗費', hint: '種・苗' },
+  { type: 'expense', name: '肥料費', line: '肥料費', hint: '液肥・培養液など' },
+  { type: 'expense', name: '農具費', line: '農具費', hint: '10万円未満の道具' },
+  { type: 'expense', name: '農薬・衛生費', line: '農薬・衛生費', hint: '農薬・消毒・防虫' },
+  { type: 'expense', name: '諸材料費', line: '諸材料費', hint: '培地・スポンジ・パネル・ビニールなど' },
+  { type: 'expense', name: '修繕費', line: '修繕費', hint: 'ハウス・ポンプ・機械の修理' },
+  { type: 'expense', name: '電気代', line: '動力光熱費', hint: 'ハウスのポンプ・照明・空調' },
+  { type: 'expense', name: '水道代', line: '動力光熱費', hint: '水道料金' },
+  { type: 'expense', name: '燃料代', line: '動力光熱費', hint: 'ガソリン・軽油・灯油・ガス' },
+  { type: 'expense', name: '作業用衣料費', line: '作業用衣料費', hint: '作業着・長靴・手袋' },
+  { type: 'expense', name: '農業共済掛金', line: '農業共済掛金', hint: '共済掛金・収入保険の保険料' },
+  { type: 'expense', name: '減価償却費', line: '減価償却費', hint: 'ハウス・機械など。年末にまとめて入力' },
+  { type: 'expense', name: '包装資材費', line: '荷造運賃手数料', hint: '袋・パック・箱・シール' },
+  { type: 'expense', name: '運賃・送料', line: '荷造運賃手数料', hint: '宅配便・配送料' },
+  { type: 'expense', name: '販売手数料', line: '荷造運賃手数料', hint: '直売所・JA・マルシェの手数料' },
+  { type: 'expense', name: '雇人費', line: '雇人費', hint: 'パート・アルバイト代' },
+  { type: 'expense', name: '利子割引料', line: '利子割引料', hint: '借入金の利息' },
+  { type: 'expense', name: '地代・賃借料', line: '地代・賃借料', hint: '土地・ハウス・機械のリース料' },
+  { type: 'expense', name: '土地改良費', line: '土地改良費', hint: '土地改良区の賦課金など' },
+  { type: 'expense', name: '通信費', line: '通信費', hint: '電話・インターネット・切手' },
+  { type: 'expense', name: '消耗品費', line: '消耗品費', hint: '文房具・電池・小物' },
+  { type: 'expense', name: '支払手数料', line: '支払手数料', hint: '振込手数料・決済手数料・税理士報酬' },
+  { type: 'expense', name: '広告宣伝費', line: '広告宣伝費', hint: 'チラシ・のぼり・ホームページ' },
+  { type: 'expense', name: '車両費', line: '車両費', hint: '車検・自動車保険・修理(ガソリンは燃料代)' },
+  { type: 'expense', name: '旅費交通費', line: '旅費交通費', hint: '出張・駐車場・高速代' },
+  { type: 'expense', name: '研修費', line: '研修費', hint: '講習会・視察・専門書' },
+  { type: 'expense', name: '会費', line: '会費', hint: 'JA・部会・組合の会費' },
+  { type: 'expense', name: '保険料', line: '保険料', hint: 'ハウスの火災保険など' },
+  { type: 'expense', name: '接待交際費', line: '接待交際費', hint: 'お中元・お歳暮・取引先との会食' },
+  { type: 'expense', name: '雑費', line: '雑費', hint: 'どれにも当てはまらないもの' }
+];
+
+// 最初に作る支払い方法
+const DEFAULT_METHODS = ['現金', '銀行口座', 'クレジットカード', 'PayPay'];
+
+// ===== 小さな道具 =====
+function escapeHtml(str) {
+  if (str === undefined || str === null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function yen(n) { return (n < 0 ? '−¥' : '¥') + Math.abs(Math.round(n || 0)).toLocaleString('ja-JP'); }
+function pad2(n) { return String(n).padStart(2, '0'); }
+function todayStr() {
+  // 日本時間の今日
+  const d = new Date(Date.now() + (new Date().getTimezoneOffset() + 540) * 60000);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+function parseDateOnly(s) { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+function weekdayOf(s) { return ['日','月','火','水','木','金','土'][parseDateOnly(s).getUTCDay()]; }
+function daysInMonth(y, m) { return new Date(Date.UTC(y, m, 0)).getUTCDate(); } // m は1〜12
+function fmtMD(s) { const [, m, d] = s.split('-').map(Number); return m + '/' + d + '(' + weekdayOf(s) + ')'; }
+function toNum(v) {
+  if (v === undefined || v === null) return 0;
+  const n = parseFloat(String(v).replace(/[,，\s]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+function monthRange(y, m) { return [y + '-' + pad2(m) + '-01', y + '-' + pad2(m) + '-' + pad2(daysInMonth(y, m))]; }
+function stepMonth(y, m, delta) { m += delta; while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; } return [y, m]; }
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+function showSaveModal(msg, ok) {
+  document.getElementById('save-status-icon').textContent = ok ? '✅' : '⚠️';
+  document.getElementById('save-status-message').textContent = msg;
+  document.getElementById('save-status-modal').style.display = 'flex';
+}
+document.getElementById('save-status-ok').addEventListener('click', () => { document.getElementById('save-status-modal').style.display = 'none'; });
+
+function showConfirm(message, okLabel) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirm-modal');
+    const okBtn = document.getElementById('confirm-modal-ok');
+    const cancelBtn = document.getElementById('confirm-modal-cancel');
+    document.getElementById('confirm-modal-message').textContent = message;
+    okBtn.textContent = okLabel || '削除する';
+    okBtn.style.background = okLabel ? '' : 'var(--danger)';
+    modal.style.display = 'flex';
+    function done(r) {
+      modal.style.display = 'none';
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onOverlay);
+      resolve(r);
+    }
+    function onOk() { done(true); }
+    function onCancel() { done(false); }
+    function onOverlay(e) { if (e.target === modal) done(false); }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    modal.addEventListener('click', onOverlay);
+  });
+}
+
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { document.getElementById(b.dataset.close).style.display = 'none'; }));
+document.getElementById('detail-modal').addEventListener('click', e => { if (e.target.id === 'detail-modal') e.target.style.display = 'none'; });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  ['detail-modal', 'save-status-modal', 'partner-pick-modal'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+});
+
+// ===== 合言葉 =====
+function getStoredPassword() { try { return localStorage.getItem(PASSWORD_STORAGE_KEY) || ''; } catch (e) { return ''; } }
+function showPasswordGate(showError) {
+  document.getElementById('password-gate').style.display = 'flex';
+  document.getElementById('password-gate-input').value = '';
+  document.getElementById('password-gate-error').classList.toggle('show', !!showError);
+}
+(function initPasswordGate() {
+  const gate = document.getElementById('password-gate');
+  if (DEMO || getStoredPassword()) gate.style.display = 'none';
+  const input = document.getElementById('password-gate-input');
+  const errorEl = document.getElementById('password-gate-error');
+  const submitBtn = document.getElementById('password-gate-submit');
+  async function trySubmit() {
+    const pw = input.value;
+    if (!pw) return;
+    submitBtn.disabled = true;
+    try {
+      const res = await fetch(SHEET_API_URL + '?action=check&pw=' + encodeURIComponent(pw));
+      const data = await res.json();
+      if (data && data.ok === true) {
+        try { localStorage.setItem(PASSWORD_STORAGE_KEY, pw); } catch (e) { /* ignore */ }
+        location.reload();
+        return;
+      }
+      errorEl.textContent = '合言葉が違います';
+      errorEl.classList.add('show');
+    } catch (e) {
+      errorEl.textContent = '確認できませんでした。通信状況をご確認ください';
+      errorEl.classList.add('show');
+    }
+    submitBtn.disabled = false;
+  }
+  submitBtn.addEventListener('click', trySubmit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') trySubmit(); });
+})();
+
+// ===== スプレッドシートとの通信(すべてGET) =====
+function pwParam() { return '&pw=' + encodeURIComponent(getStoredPassword()); }
+function handleUnauthorized() {
+  try { localStorage.removeItem(PASSWORD_STORAGE_KEY); } catch (e) { /* ignore */ }
+  showPasswordGate(true); // 画面のデータは消さない
+  const err = new Error('unauthorized');
+  err.unauthorized = true;
+  return err;
+}
+async function sheetFetchJson(query) {
+  const res = await fetch(SHEET_API_URL + '?' + query + pwParam());
+  if (!res.ok) throw new Error('通信に失敗しました(HTTP ' + res.status + ')');
+  const data = await res.json();
+  if (data && data.error === 'unauthorized') throw handleUnauthorized();
+  return data;
+}
+const MAX_QUERY_LEN = 5000; // 1回の通信で送る文字数の上限(長すぎると失敗するため)
+const sheetStorage = {
+  async set(key, value) {
+    if (DEMO) return;
+    const data = await sheetFetchJson('action=set&key=' + encodeURIComponent(key) + '&value=' + encodeURIComponent(value));
+    if (!data.success) throw new Error('保存に失敗しました');
+  },
+  async del(key) {
+    if (DEMO) return;
+    const data = await sheetFetchJson('action=delete&key=' + encodeURIComponent(key));
+    if (!data.success) throw new Error('削除に失敗しました');
+  },
+  async getAll() {
+    const data = await sheetFetchJson('action=getAll');
+    if (!Array.isArray(data.rows)) throw new Error('データの形が正しくありません');
+    return data.rows;
+  },
+  // 何件かずつまとめて送る。onProgress(済んだ件数, 全件数)
+  async batch(action, items, onProgress) {
+    if (DEMO) { if (onProgress) onProgress(items.length, items.length); return; }
+    let i = 0;
+    while (i < items.length) {
+      const chunk = [];
+      while (i < items.length) {
+        const next = chunk.concat([items[i]]);
+        if (chunk.length > 0 && encodeURIComponent(JSON.stringify(next)).length > MAX_QUERY_LEN) break;
+        chunk.push(items[i]);
+        i++;
+      }
+      const data = await sheetFetchJson('action=' + action + '&value=' + encodeURIComponent(JSON.stringify(chunk)));
+      if (!data.success) throw new Error('保存に失敗しました');
+      if (onProgress) onProgress(i, items.length);
+    }
+  }
+};
+
+// ===== データ =====
+let categories = []; // cat_<id>   科目
+let entries = [];    // entry_<id> 1回のお金の出入り
+let methods = [];    // method_<id> 支払い方法
+let partners = [];   // partner_<id> 取引先
+let settings = { fyStart: 1 }; // settings(1行)
+let loadedOnce = false;
+
+const PREFIX = { category: 'cat_', entry: 'entry_', method: 'method_', partner: 'partner_' };
+function keyOf(kind, rec) { return PREFIX[kind] + rec.id; }
+
+async function loadData() {
+  if (DEMO) { loadedOnce = true; return true; }
+  try {
+    const rows = await sheetStorage.getAll();
+    const nc = [], ne = [], nm = [], np = [];
+    let ns = null;
+    rows.forEach(([key, value]) => {
+      if (typeof key !== 'string' || !value) return;
+      let obj;
+      try { obj = JSON.parse(value); } catch (e) { console.error('parse error', key); return; }
+      if (key.indexOf(PREFIX.category) === 0) nc.push(obj);
+      else if (key.indexOf(PREFIX.entry) === 0) ne.push(obj);
+      else if (key.indexOf(PREFIX.method) === 0) nm.push(obj);
+      else if (key.indexOf(PREFIX.partner) === 0) np.push(obj);
+      else if (key === 'settings') ns = obj;
+    });
+    categories = nc; entries = ne; methods = nm; partners = np; settings = Object.assign({ fyStart: 1 }, ns || {});
+    sortMasters();
+    loadedOnce = true;
+    saveToCache();
+    return true;
+  } catch (e) {
+    console.error(e);
+    // 失敗したときは画面のデータをそのまま残す(空で上書きしない)
+    if (!e.unauthorized) showToast('データの読み込みに失敗しました: ' + e.message);
+    return false;
+  }
+}
+function sortMasters() {
+  categories.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  methods.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  partners.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+}
+function saveToCache() {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ categories, entries, methods, partners, settings, cachedAt: Date.now() })); } catch (e) { /* ignore */ }
+}
+function loadFromCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    if (!c) return false;
+    categories = c.categories || []; entries = c.entries || []; methods = c.methods || []; partners = c.partners || []; settings = Object.assign({ fyStart: 1 }, c.settings || {});
+    sortMasters();
+    return true;
+  } catch (e) { return false; }
+}
+async function saveRecord(kind, rec) {
+  try { await sheetStorage.set(keyOf(kind, rec), JSON.stringify(rec)); saveToCache(); return true; }
+  catch (e) { if (!e.unauthorized) showToast('保存に失敗しました。もう一度お試しください'); return false; }
+}
+async function deleteRecord(kind, id) {
+  try { await sheetStorage.del(PREFIX[kind] + id); saveToCache(); return true; }
+  catch (e) { if (!e.unauthorized) showToast('削除に失敗しました。もう一度お試しください'); return false; }
+}
+async function saveSettings() {
+  try { await sheetStorage.set('settings', JSON.stringify(settings)); saveToCache(); return true; }
+  catch (e) { if (!e.unauthorized) showToast('保存に失敗しました。もう一度お試しください'); return false; }
+}
+
+function catById(id) { return categories.find(c => c.id === id); }
+function catName(id) { const c = catById(id); return c ? c.name : '(削除済みの科目)'; }
+function catOrder(id) { const i = categories.findIndex(c => c.id === id); return i === -1 ? 9999 : i; }
+function typeLabel(t) { return t === 'income' ? '収入' : '支出'; }
+function methodById(id) { return methods.find(m => m.id === id); }
+function methodName(id) { if (!id) return '未設定'; const m = methodById(id); return m ? m.name : '(削除済みの方法)'; }
+function methodOrder(id) { if (!id) return 99999; const i = methods.findIndex(m => m.id === id); return i === -1 ? 9999 : i; }
+function partnerById(id) { return partners.find(x => x.id === id); }
+function partnerByName(name) { const n = String(name || '').trim(); return n ? partners.find(x => x.name === n) : null; }
+// 記録に表示する取引先名(登録済みなら今の名前)
+function payeeOf(e) { const pt = e.payeeId && partnerById(e.payeeId); return pt ? pt.name : (e.payee || ''); }
+function catOptionsAll(selectedId, emptyLabel) {
+  const group = type => {
+    const list = categories.filter(c => c.type === type && (!c.hidden || c.id === selectedId));
+    return list.length ? `<optgroup label="${typeLabel(type)}">${list.map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}</optgroup>` : '';
+  };
+  return `<option value="">${emptyLabel || '決めない'}</option>` + group('expense') + group('income');
+}
+function methodOptions(selectedId, emptyLabel) {
+  const list = methods.filter(m => !m.hidden || m.id === selectedId);
+  let html = `<option value="">${emptyLabel || '未設定'}</option>` + list.map(m => `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('');
+  if (selectedId && !methodById(selectedId)) html += `<option value="${escapeHtml(selectedId)}" selected>(削除済みの方法)</option>`;
+  return html;
+}
+
+// ===== 計算(画面・集計・印刷のすべてでこの関数を使う) =====
+function entryAmount(e) { return toNum(e.amount); }
+// 事業で使う割合(%)。収入は常に100%
+function catRatio(c) {
+  if (!c || c.type === 'income') return 100;
+  const r = c.ratio === undefined || c.ratio === null || c.ratio === '' ? 100 : toNum(c.ratio);
+  return Math.max(0, Math.min(100, r));
+}
+// 確定申告での科目名
+function catLine(c) { return c ? (c.line || c.name) : '(削除済みの科目)'; }
+function sortEntries(list) {
+  return list.slice().sort((a, b) => a.date !== b.date ? (a.date < b.date ? -1 : 1) : (a.createdAt || 0) - (b.createdAt || 0));
+}
+function entriesBetween(from, to) { return sortEntries(entries.filter(e => e.date >= from && e.date <= to)); }
+// 合計を出す
+function tally(list) {
+  const t = { income: 0, expense: 0, byCat: {}, byMethod: {}, count: list.length };
+  list.forEach(e => {
+    const a = entryAmount(e);
+    if (e.type === 'income') t.income += a; else t.expense += a;
+    t.byCat[e.categoryId] = (t.byCat[e.categoryId] || 0) + a;
+    const mk = e.methodId || '';
+    if (!t.byMethod[mk]) t.byMethod[mk] = { income: 0, expense: 0, count: 0 };
+    t.byMethod[mk][e.type === 'income' ? 'income' : 'expense'] += a;
+    t.byMethod[mk].count++;
+  });
+  t.net = t.income - t.expense;
+  return t;
+}
+// 年の区切り(始まりの月はマスタで設定)
+function fyStart() { const s = parseInt(settings.fyStart, 10); return s >= 1 && s <= 12 ? s : 1; }
+function fiscalYearOf(dateStr) { const [y, m] = dateStr.split('-').map(Number); return m >= fyStart() ? y : y - 1; }
+function fyRange(fy) {
+  const s = fyStart(), months = [];
+  for (let i = 0; i < 12; i++) { const m = s + i; months.push(m <= 12 ? fy + '-' + pad2(m) : (fy + 1) + '-' + pad2(m - 12)); }
+  const [ly, lm] = months[11].split('-').map(Number);
+  return { months, from: months[0] + '-01', to: months[11] + '-' + pad2(daysInMonth(ly, lm)) };
+}
+function fyTitle(fy) {
+  const s = fyStart();
+  if (s === 1) return fy + '年(1月〜12月)';
+  return fy + '年度(' + fy + '年' + s + '月〜' + (fy + 1) + '年' + (s - 1) + '月)';
+}
+// 確定申告用:決算書の科目ごとにまとめる
+function taxLines(list) {
+  const t = tally(list);
+  const groups = {};
+  Object.keys(t.byCat).forEach(id => {
+    const amount = t.byCat[id];
+    if (!amount) return;
+    const c = catById(id);
+    const type = c ? c.type : (list.find(e => e.categoryId === id) || {}).type || 'expense';
+    const line = catLine(c);
+    const ratio = catRatio(c);
+    const key = type + '|' + line;
+    if (!groups[key]) groups[key] = { type, line, total: 0, biz: 0, notes: [] };
+    const g = groups[key];
+    g.total += amount;
+    g.biz += Math.floor(amount * ratio / 100); // 按分は1円未満切り捨て
+    if (ratio < 100) g.notes.push(catName(id) + ' ' + ratio + '%');
+    else if (c && c.name !== line) g.notes.push(catName(id));
+  });
+  const order = g => {
+    const lines = REPORT_LINES[g.type];
+    const i = lines.indexOf(g.line);
+    if (i !== -1) return g.line === '雑費' ? 9000 : i;
+    return 5000; // 自分で作った科目は雑費の前
+  };
+  const pick = type => Object.values(groups).filter(g => g.type === type).sort((a, b) => order(a) - order(b) || (a.line < b.line ? -1 : 1));
+  const inc = pick('income'), exp = pick('expense');
+  const incTotal = inc.reduce((a, g) => a + g.biz, 0), expTotal = exp.reduce((a, g) => a + g.biz, 0);
+  return { inc, exp, incTotal, expTotal, net: incTotal - expTotal, bookIncome: t.income, bookExpense: t.expense };
+}
+
+// ===== タブ =====
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    renderTab(btn.dataset.tab);
+  });
+});
+function activeTab() { const b = document.querySelector('.tab-btn.active'); return b ? b.dataset.tab : 'input'; }
+function renderTab(tab) {
+  if (tab === 'input') { renderEntryForm(); renderList(); }
+  if (tab === 'summary') renderAnalysis();
+  if (tab === 'master') renderMaster();
+}
+function renderAll() {
+  document.getElementById('setup-card').style.display = (loadedOnce && categories.length === 0) ? 'block' : 'none';
+  renderTab(activeTab());
+}
+function goTab(tab) { document.querySelector('.tab-btn[data-tab="' + tab + '"]').click(); }
+
+// ===== 入力 =====
+let entryType = 'expense';
+let editingId = null;
+
+function catOptions(type, selectedId) {
+  const list = categories.filter(c => c.type === type && (!c.hidden || c.id === selectedId));
+  let html = '<option value="">選んでください</option>' + list.map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+  if (selectedId && !catById(selectedId)) html += `<option value="${escapeHtml(selectedId)}" selected>(削除済みの科目)</option>`;
+  return html;
+}
+function setEntryType(type) {
+  entryType = type;
+  document.getElementById('e-method-label').textContent = type === 'income' ? '受け取り方法' : '支払い方法';
+  document.querySelectorAll('#e-type .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+}
+document.querySelectorAll('#e-type .seg-btn').forEach(b => b.addEventListener('click', () => {
+  if (b.dataset.type === entryType) return;
+  setEntryType(b.dataset.type);
+  renderCatSelect('');
+}));
+function renderCatSelect(selectedId) {
+  document.getElementById('e-cat').innerHTML = catOptions(entryType, selectedId);
+  updateCatHint();
+}
+function updateCatHint() {
+  const c = catById(document.getElementById('e-cat').value);
+  const parts = [];
+  if (c && c.hint) parts.push('例: ' + c.hint);
+  if (c && catRatio(c) < 100) parts.push('確定申告では ' + catRatio(c) + '% を経費にします');
+  document.getElementById('e-cat-hint').textContent = parts.join('　');
+}
+document.getElementById('e-cat').addEventListener('change', updateCatHint);
+function renderPayeeList() {
+  const seen = {}, list = [];
+  partners.filter(x => !x.hidden).forEach(x => { seen[x.name] = true; list.push(x.name); });
+  sortEntries(entries).reverse().forEach(e => { const p = payeeOf(e).trim(); if (p && !seen[p]) { seen[p] = true; list.push(p); } });
+  document.getElementById('payee-list').innerHTML = list.slice(0, 150).map(p => `<option value="${escapeHtml(p)}">`).join('');
+}
+// 取引先の入力に合わせて、科目・支払い方法を自動で入れる
+function applyPartner(fill) {
+  const name = document.getElementById('e-payee').value.trim();
+  const pt = partnerByName(name);
+  const hint = document.getElementById('e-payee-hint');
+  if (pt) {
+    if (fill) {
+      const c = pt.categoryId && catById(pt.categoryId);
+      if (c && !c.hidden) { setEntryType(c.type); renderCatSelect(c.id); }
+      if (pt.methodId && methodById(pt.methodId) && !methodById(pt.methodId).hidden) renderMethodSelect(pt.methodId);
+    }
+    hint.innerHTML = '✓ 登録済みの取引先' + (pt.memo ? '(' + escapeHtml(pt.memo) + ')' : '');
+  } else if (name) {
+    // 同じ名前なら作り直さない(ボタンを押した瞬間に消えないように)
+    if (hint.dataset.name === name && document.getElementById('e-payee-reg')) return;
+    hint.innerHTML = '<button type="button" class="btn-text" id="e-payee-reg" style="padding:0;">＋「' + escapeHtml(name) + '」を取引先に登録する</button>';
+    document.getElementById('e-payee-reg').addEventListener('click', quickAddPartner);
+  } else hint.innerHTML = '';
+  hint.dataset.name = name;
+}
+async function quickAddPartner() {
+  const name = document.getElementById('e-payee').value.trim();
+  if (!name || partnerByName(name)) return;
+  const pt = { id: uid(), name, categoryId: document.getElementById('e-cat').value, methodId: document.getElementById('e-method').value, memo: '', sortOrder: nextPartnerOrder() };
+  partners.push(pt);
+  applyPartner(false);
+  renderPayeeList();
+  if (await saveRecord('partner', pt)) showToast('「' + name + '」を取引先に登録しました(今の科目・支払い方法を「よく使う」にしました)');
+}
+document.getElementById('e-payee').addEventListener('change', () => applyPartner(true));
+
+// ----- 取引先を一覧から選ぶ -----
+function renderPartnerPick() {
+  const q = document.getElementById('pp-q').value.trim();
+  const cur = document.getElementById('e-payee').value.trim();
+  const list = partners.filter(x => !x.hidden && (!q || x.name.indexOf(q) !== -1));
+  const wrap = document.getElementById('pp-list');
+  if (!partners.some(x => !x.hidden)) {
+    wrap.innerHTML = '<div class="empty-state">まだ取引先が登録されていません。<br>下の「取引先を登録・編集する」から登録できます。</div>';
+    return;
+  }
+  if (!list.length) { wrap.innerHTML = '<div class="empty-state">「' + escapeHtml(q) + '」に合う取引先はありません</div>'; return; }
+  const item = x => {
+    const c = x.categoryId && catById(x.categoryId);
+    const sub = [c ? c.name : '', x.methodId ? methodName(x.methodId) : ''].filter(Boolean).join('・');
+    return `<button type="button" class="pp-item ${x.name === cur ? 'current' : ''}" data-pp="${x.id}"><span>${escapeHtml(x.name)}</span><span class="pp-sub">${escapeHtml(sub)}</span></button>`;
+  };
+  let html = '';
+  if (!q) {
+    // 最近使った取引先(新しい順に5件)
+    const recent = [], seen = {};
+    sortEntries(entries).reverse().forEach(e => {
+      const x = e.payeeId && partnerById(e.payeeId);
+      if (x && !x.hidden && !seen[x.id] && recent.length < 5) { seen[x.id] = true; recent.push(x); }
+    });
+    if (recent.length && list.length > 6) html += '<div class="pp-sec">最近使った取引先</div>' + recent.map(item).join('') + '<div class="pp-sec">すべての取引先</div>';
+  }
+  html += list.map(item).join('');
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-pp]').forEach(b => b.addEventListener('click', () => {
+    const x = partnerById(b.dataset.pp);
+    document.getElementById('e-payee').value = x.name;
+    document.getElementById('partner-pick-modal').style.display = 'none';
+    applyPartner(true);
+  }));
+}
+document.getElementById('e-payee-pick').addEventListener('click', () => {
+  document.getElementById('pp-q').value = '';
+  renderPartnerPick();
+  document.getElementById('partner-pick-modal').style.display = 'flex';
+});
+document.getElementById('pp-q').addEventListener('input', renderPartnerPick);
+document.getElementById('partner-pick-modal').addEventListener('click', e => { if (e.target.id === 'partner-pick-modal') e.target.style.display = 'none'; });
+document.getElementById('pp-clear').addEventListener('click', () => {
+  document.getElementById('e-payee').value = '';
+  document.getElementById('partner-pick-modal').style.display = 'none';
+  applyPartner(false);
+});
+document.getElementById('pp-master').addEventListener('click', () => {
+  document.getElementById('partner-pick-modal').style.display = 'none';
+  goTab('master');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+document.getElementById('e-payee').addEventListener('input', () => {
+  // 候補から選んだときはすぐ反映
+  if (partnerByName(document.getElementById('e-payee').value)) applyPartner(true); else applyPartner(false);
+});
+let lastMethodId = '';
+try { lastMethodId = localStorage.getItem('shushi_last_method') || ''; } catch (e) { /* ignore */ }
+function renderMethodSelect(selectedId) {
+  document.getElementById('e-method').innerHTML = methodOptions(selectedId, methods.length ? '選ばない' : '(マスタで登録すると選べます)');
+}
+function renderEntryForm() {
+  if (!document.getElementById('e-date').value) document.getElementById('e-date').value = todayStr();
+  renderCatSelect(document.getElementById('e-cat').value);
+  const curM = document.getElementById('e-method').value || (editingId ? '' : lastMethodId);
+  renderMethodSelect(methodById(curM) && !methodById(curM).hidden ? curM : (editingId ? curM : ''));
+  renderPayeeList();
+}
+// 記録後は日付・区分を残し、ほかを空にする
+function resetEntryForm() {
+  editingId = null;
+  document.getElementById('e-heading').textContent = 'お金の出入りを記録';
+  document.getElementById('e-submit').textContent = '記録する';
+  document.getElementById('e-cancel').style.display = 'none';
+  document.getElementById('e-amount').value = '';
+  document.getElementById('e-payee').value = '';
+  document.getElementById('e-payee-hint').innerHTML = '';
+  document.getElementById('e-memo').value = '';
+  document.getElementById('e-error').classList.remove('show');
+  renderCatSelect('');
+  renderMethodSelect(methodById(lastMethodId) && !methodById(lastMethodId).hidden ? lastMethodId : '');
+  renderPayeeList();
+}
+function fillEntryForm(e, asCopy) {
+  setEntryType(e.type);
+  document.getElementById('e-date').value = asCopy ? todayStr() : e.date;
+  renderCatSelect(e.categoryId);
+  renderMethodSelect(e.methodId || '');
+  document.getElementById('e-amount').value = e.amount;
+  document.getElementById('e-payee').value = payeeOf(e);
+  applyPartner(false);
+  document.getElementById('e-memo').value = e.memo || '';
+}
+function editEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  goTab('input');
+  editingId = id;
+  fillEntryForm(e, false);
+  document.getElementById('e-heading').textContent = fmtMD(e.date) + 'の記録を直す';
+  document.getElementById('e-submit').textContent = '更新する';
+  document.getElementById('e-cancel').style.display = 'inline-block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function copyEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  goTab('input');
+  resetEntryForm();
+  fillEntryForm(e, true);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showToast('同じ内容を入れました。日付と金額を確かめて「記録する」を押してください');
+}
+document.getElementById('e-cancel').addEventListener('click', resetEntryForm);
+document.getElementById('e-amount').addEventListener('keydown', ev => { if (ev.key === 'Enter') document.getElementById('e-submit').click(); });
+
+document.getElementById('e-submit').addEventListener('click', async () => {
+  const date = document.getElementById('e-date').value;
+  const categoryId = document.getElementById('e-cat').value;
+  const amountStr = String(document.getElementById('e-amount').value).trim();
+  const amount = amountStr === '' ? 0 : toNum(amountStr);
+  const errorEl = document.getElementById('e-error');
+  let msg = '';
+  if (!date) msg = '日付を選んでください';
+  else if (!categoryId) msg = '科目を選んでください';
+  else if (!amount) msg = '金額を入力してください';
+  if (msg) { errorEl.textContent = msg; errorEl.classList.add('show'); return; }
+  errorEl.classList.remove('show');
+  const fields = {
+    date, type: entryType, categoryId, amount: Math.round(amount),
+    methodId: document.getElementById('e-method').value,
+    payee: document.getElementById('e-payee').value.trim(),
+    payeeId: (partnerByName(document.getElementById('e-payee').value) || {}).id || '',
+    memo: document.getElementById('e-memo').value.trim()
+  };
+  if (fields.methodId) { lastMethodId = fields.methodId; try { localStorage.setItem('shushi_last_method', lastMethodId); } catch (e) { /* ignore */ } }
+  const btn = document.getElementById('e-submit');
+  btn.disabled = true;
+  let rec;
+  const wasEditing = !!editingId;
+  if (editingId) {
+    rec = entries.find(x => x.id === editingId);
+    if (!rec) { btn.disabled = false; resetEntryForm(); return; }
+    Object.assign(rec, fields, { updatedAt: Date.now() });
+  } else {
+    rec = Object.assign({ id: uid(), createdAt: Date.now() }, fields);
+    entries.push(rec);
+  }
+  [lYear, lMonth] = date.split('-').map(Number);
+  renderList(); // 先に画面を更新
+  const ok = await saveRecord('entry', rec);
+  btn.disabled = false;
+  if (ok) {
+    showSaveModal((wasEditing ? '更新しました:' : '記録しました:') + fmtMD(date) + ' ' + catName(categoryId) + ' ' + yen(rec.amount) + (rec.methodId ? '(' + methodName(rec.methodId) + ')' : ''), true);
+    resetEntryForm();
+  } else {
+    showSaveModal('保存できませんでした。通信状況を確認して、「最新に更新」を押してから内容を確かめてください', false);
+  }
+  renderList();
+});
+
+async function deleteEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return false;
+  if (!(await showConfirm(fmtMD(e.date) + '「' + catName(e.categoryId) + '」' + yen(entryAmount(e)) + (payeeOf(e) ? '(' + payeeOf(e) + ')' : '') + ' を削除しますか？'))) return false;
+  entries = entries.filter(x => x.id !== id);
+  if (editingId === id) resetEntryForm();
+  renderTab(activeTab());
+  if (await deleteRecord('entry', id)) showToast('削除しました');
+  return true;
+}
+
+// ===== 月の明細 =====
+let lYear, lMonth;
+(function () { const [y, m] = todayStr().split('-').map(Number); lYear = y; lMonth = m; })();
+
+function renderListFilterCats() {
+  const sel = document.getElementById('lf-cat');
+  const cur = sel.value;
+  const group = type => {
+    const list = categories.filter(c => c.type === type);
+    return list.length ? `<optgroup label="${typeLabel(type)}">${list.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}</optgroup>` : '';
+  };
+  sel.innerHTML = '<option value="">すべて</option>' + group('expense') + group('income');
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  const ms = document.getElementById('lf-method');
+  const curM = ms.value;
+  ms.innerHTML = '<option value="">すべて</option>' + methods.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('') + '<option value="__none">未設定</option>';
+  if ([...ms.options].some(o => o.value === curM)) ms.value = curM;
+}
+function filteredMonthEntries() {
+  const [from, to] = monthRange(lYear, lMonth);
+  const t = document.getElementById('lf-type').value;
+  const c = document.getElementById('lf-cat').value;
+  const pm = document.getElementById('lf-method').value;
+  const q = document.getElementById('lf-q').value.trim().toLowerCase();
+  return entriesBetween(from, to).filter(e =>
+    (!t || e.type === t) && (!c || e.categoryId === c) &&
+    (!pm || (pm === '__none' ? !e.methodId : e.methodId === pm)) &&
+    (!q || (payeeOf(e) + ' ' + (e.memo || '') + ' ' + catName(e.categoryId)).toLowerCase().indexOf(q) !== -1));
+}
+function statBoxes(t, labels) {
+  labels = labels || {};
+  return `
+    <div class="stat-box inc"><div class="stat-label">${labels.inc || '収入'}</div><div class="stat-value">${yen(t.income)}</div></div>
+    <div class="stat-box exp"><div class="stat-label">${labels.exp || '支出'}</div><div class="stat-value">${yen(t.expense)}</div></div>
+    <div class="stat-box net ${t.net < 0 ? 'minus' : ''}"><div class="stat-label">${labels.net || '差引(収入−支出)'}</div><div class="stat-value">${yen(t.net)}</div></div>`;
+}
+function renderList() {
+  renderListFilterCats();
+  const now = todayStr().split('-').map(Number);
+  document.getElementById('l-title').textContent = lYear + '年' + lMonth + '月';
+  document.getElementById('l-jump').style.display = (lYear === now[0] && lMonth === now[1]) ? 'none' : 'inline-block';
+  const [from, to] = monthRange(lYear, lMonth);
+  document.getElementById('l-stats').innerHTML = statBoxes(tally(entriesBetween(from, to)));
+  const list = filteredMonthEntries();
+  const wrap = document.getElementById('l-table');
+  if (list.length === 0) {
+    const filtered = document.getElementById('lf-type').value || document.getElementById('lf-cat').value || document.getElementById('lf-method').value || document.getElementById('lf-q').value.trim();
+    wrap.innerHTML = '<div class="empty-state">' + (filtered ? '条件に合う記録はありません' : 'この月の記録はありません') + '</div>';
+    return;
+  }
+  const t = tally(list);
+  wrap.innerHTML = `<table class="fixed-table">
+    <colgroup><col style="width:92px"><col style="width:150px"><col style="width:100px"><col style="width:100px"><col style="width:110px"><col style="width:140px"><col style="width:180px"><col style="width:58px"></colgroup>
+    <thead><tr><th class="col-first">日付</th><th>科目</th><th class="num">収入</th><th class="num">支出</th><th>支払い方法</th><th>取引先・お店</th><th>メモ</th><th></th></tr></thead>
+    <tbody>${list.map(e => {
+      const w = weekdayOf(e.date);
+      return `<tr class="clickable" data-id="${e.id}">
+        <td class="col-first ${w === '日' ? 'sun' : w === '土' ? 'sat' : ''}">${fmtMD(e.date)}</td>
+        <td class="left"><span class="tag ${e.type === 'income' ? 'inc' : 'exp'}">${typeLabel(e.type)}</span>${escapeHtml(catName(e.categoryId))}</td>
+        <td class="num inc">${e.type === 'income' ? yen(entryAmount(e)) : ''}</td>
+        <td class="num exp">${e.type === 'expense' ? yen(entryAmount(e)) : ''}</td>
+        <td class="${e.methodId ? '' : 'hint'}">${escapeHtml(e.methodId ? methodName(e.methodId) : '−')}</td>
+        <td class="left">${escapeHtml(payeeOf(e))}</td>
+        <td class="left">${escapeHtml(e.memo || '')}</td>
+        <td><button class="btn-text-danger" data-del="${e.id}" aria-label="削除">削除</button></td>
+      </tr>`;
+    }).join('')}</tbody>
+    <tfoot><tr><td class="col-first">合計</td><td class="left">${list.length}件</td><td class="num inc">${yen(t.income)}</td><td class="num exp">${yen(t.expense)}</td><td colspan="4" class="left">差引 ${yen(t.net)}</td></tr></tfoot>
+  </table>`;
+  wrap.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', ev => {
+    if (ev.target.closest('[data-del]')) return;
+    openDetail(tr.dataset.id);
+  }));
+  wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteEntry(b.dataset.del)));
+  applyZoom();
+}
+['lf-type', 'lf-cat', 'lf-method'].forEach(id => document.getElementById(id).addEventListener('change', renderList));
+document.getElementById('lf-q').addEventListener('input', renderList);
+document.getElementById('l-prev').addEventListener('click', () => { [lYear, lMonth] = stepMonth(lYear, lMonth, -1); renderList(); });
+document.getElementById('l-next').addEventListener('click', () => { [lYear, lMonth] = stepMonth(lYear, lMonth, 1); renderList(); });
+document.getElementById('l-jump').addEventListener('click', () => { [lYear, lMonth] = todayStr().split('-').map(Number); renderList(); });
+
+function openDetail(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  const c = catById(e.categoryId);
+  document.getElementById('detail-title').textContent = fmtMD(e.date) + '　' + typeLabel(e.type);
+  const body = document.getElementById('detail-body');
+  body.innerHTML = `<table class="detail-table"><tbody>
+      <tr><td>金額</td><td style="font-size:20px; font-weight:700; color:${e.type === 'income' ? 'var(--inc)' : 'var(--exp)'};">${yen(entryAmount(e))}</td></tr>
+      <tr><td>科目</td><td>${escapeHtml(catName(e.categoryId))}${c ? `<div class="hint">確定申告では「${escapeHtml(catLine(c))}」${catRatio(c) < 100 ? '(' + catRatio(c) + '%を経費)' : ''}</div>` : ''}</td></tr>
+      <tr><td>${e.type === 'income' ? '受け取り方法' : '支払い方法'}</td><td>${escapeHtml(methodName(e.methodId))}</td></tr>
+      <tr><td>取引先</td><td>${escapeHtml(payeeOf(e) || '−')}${e.payeeId && partnerById(e.payeeId) ? ' <span class="hint">(登録済み)</span>' : ''}</td></tr>
+      <tr><td>メモ</td><td style="white-space:pre-wrap;">${escapeHtml(e.memo || '−')}</td></tr>
+    </tbody></table>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-primary" id="dt-edit">直す</button>
+      <button class="btn-ghost" id="dt-copy">複製して新しく記録</button>
+      <button class="btn-ghost btn-danger" id="dt-del" style="margin-left:auto;">削除</button>
+    </div>`;
+  document.getElementById('dt-edit').addEventListener('click', () => { document.getElementById('detail-modal').style.display = 'none'; editEntry(id); });
+  document.getElementById('dt-copy').addEventListener('click', () => { document.getElementById('detail-modal').style.display = 'none'; copyEntry(id); });
+  document.getElementById('dt-del').addEventListener('click', async () => { if (await deleteEntry(id)) document.getElementById('detail-modal').style.display = 'none'; });
+  document.getElementById('detail-modal').style.display = 'flex';
+}
+
+// ===== 集計 =====
+let yFY = fiscalYearOf(todayStr());
+let aView = 'month';
+function shortYen(n) {
+  if (Math.abs(n) >= 10000) return (Math.round(n / 1000) / 10).toString().replace(/\.0$/, '') + '万';
+  return Math.round(n).toLocaleString('ja-JP');
+}
+function share(v, total) { return total ? (Math.round(v / total * 1000) / 10).toFixed(1) + '%' : '-'; }
+
+// ----- 棒グラフ(SVG)。series: [{name, color, values}] -----
+function niceScale(v) {
+  if (v <= 0) return { max: 1, ticks: 4 };
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const m = v / p;
+  const step = m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10;
+  return { max: step * p, ticks: step === 2 ? 4 : 5 };
+}
+function barPath(x, y, w, h, r) {
+  if (h <= 0) return '';
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+function barChart(o) {
+  const labels = o.labels, series = o.series;
+  const W = Math.max(320, o.width || 680), H = o.height || (W < 500 ? 200 : 240), pl = 42, pr = 6, pt = 12, pb = 24;
+  const n = labels.length;
+  const totals = labels.map((_, i) => Math.max(0, ...series.map(s => s.values[i] || 0)));
+  const sc = niceScale(Math.max(...totals, 0)), max = sc.max;
+  const ih = H - pt - pb, band = (W - pl - pr) / n;
+  const y = v => pt + ih - (v / max) * ih;
+  const parts = [];
+  for (let t = 0; t <= sc.ticks; t++) {
+    const v = max * t / sc.ticks, yy = y(v);
+    parts.push(`<line class="grid" x1="${pl}" x2="${W - pr}" y1="${yy}" y2="${yy}"/><text class="axis-label" x="${pl - 6}" y="${yy + 4}" text-anchor="end">${shortYen(v)}</text>`);
+  }
+  labels.forEach((lb, i) => {
+    const x0 = pl + band * i;
+    const tip = `<div class="t">${escapeHtml(o.tipTitle ? o.tipTitle(i) : lb)}</div>` + series.map(s => `<div><i style="background:${s.color}"></i>${escapeHtml(s.name)} ${yen(s.values[i] || 0)}</div>`).join('') + (o.tipExtra ? o.tipExtra(i) : '');
+    parts.push(`<rect class="band" x="${x0}" y="${pt}" width="${band}" height="${ih}" fill="transparent" data-tip="${escapeHtml(tip)}"/>`);
+    const gw = Math.min(band * 0.7, 22 * series.length), bw = gw / series.length - (series.length > 1 ? 2 : 0), bx0 = x0 + (band - gw) / 2;
+    series.forEach((s, k) => {
+      const v = Math.max(0, s.values[i] || 0); if (!v) return;
+      parts.push(`<path d="${barPath(bx0 + k * (bw + 2), y(v), bw, y(0) - y(v), 4)}" fill="${s.color}" pointer-events="none"/>`);
+    });
+    parts.push(`<text class="axis-label" x="${x0 + band / 2}" y="${H - 8}" text-anchor="middle">${escapeHtml(lb)}</text>`);
+  });
+  const legend = series.length > 1 ? `<div class="chart-legend">${series.map(s => `<span><i style="background:${s.color}"></i>${escapeHtml(s.name)}</span>`).join('')}</div>` : '';
+  return `<div class="chart">${legend}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escapeHtml(o.title || 'グラフ')}">${parts.join('')}</svg></div>`;
+}
+// 横棒(内訳用)
+function hbarChart(items, color) {
+  const max = Math.max(...items.map(x => x.value), 1);
+  return `<div class="chart">${items.map(x => `<div class="bar-row" data-tip="${escapeHtml('<div class="t">' + escapeHtml(x.label) + '</div><div>' + yen(x.value) + (x.share ? '(' + x.share + ')' : '') + '</div>')}">
+    <div class="bar-label" title="${escapeHtml(x.label)}">${escapeHtml(x.label)}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${Math.max(1, x.value / max * 100)}%; background:${color};"></div></div>
+    <div class="bar-value">${yen(x.value)}${x.share ? `<span class="hint">${x.share}</span>` : ''}</div></div>`).join('')}</div>`;
+}
+// ツールチップ
+(function initChartTip() {
+  const tip = document.getElementById('chart-tip');
+  document.addEventListener('mousemove', e => {
+    const t = e.target.closest ? e.target.closest('[data-tip]') : null;
+    if (!t) { tip.style.display = 'none'; return; }
+    tip.innerHTML = t.getAttribute('data-tip');
+    tip.style.display = 'block';
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = e.clientX + 14, yy = e.clientY + 14;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
+    if (yy + h > window.innerHeight - 8) yy = e.clientY - h - 14;
+    tip.style.left = x + 'px'; tip.style.top = yy + 'px';
+  });
+  document.addEventListener('touchstart', e => {
+    const t = e.target.closest ? e.target.closest('[data-tip]') : null;
+    if (!t) { tip.style.display = 'none'; return; }
+    tip.innerHTML = t.getAttribute('data-tip');
+    tip.style.display = 'block';
+    const r = t.getBoundingClientRect();
+    tip.style.left = Math.max(8, Math.min(window.innerWidth - tip.offsetWidth - 8, r.left)) + 'px';
+    tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
+  }, { passive: true });
+})();
+
+document.querySelectorAll('#a-mode .seg-btn').forEach(b => b.addEventListener('click', () => {
+  aView = b.dataset.view;
+  document.querySelectorAll('#a-mode .seg-btn').forEach(x => x.classList.toggle('active', x === b));
+  renderAnalysis();
+}));
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (activeTab() === 'summary') renderAnalysis(); }, 250);
+});
+function renderAnalysis() {
+  ['month', 'category', 'method', 'partner', 'tax'].forEach(v => { document.getElementById('view-' + v).style.display = v === aView ? 'block' : 'none'; });
+  document.getElementById('y-print').style.display = (aView === 'month' || aView === 'tax') ? '' : 'none';
+  document.getElementById('y-title').textContent = fyTitle(yFY);
+  const { from, to } = fyRange(yFY);
+  const list = entriesBetween(from, to);
+  if (aView === 'tax') {
+    const T = taxLines(list);
+    document.getElementById('y-stats').innerHTML = statBoxes({ income: T.incTotal, expense: T.expTotal, net: T.net }, { inc: '収入(申告用)', exp: '経費(申告用)', net: '所得の目安(収入−経費)' });
+  } else {
+    document.getElementById('y-stats').innerHTML = statBoxes(tally(list), { inc: '年間の収入', exp: '年間の支出', net: '年間の差引' });
+  }
+  if (aView === 'month') renderMonthly();
+  if (aView === 'category') renderCategory();
+  if (aView === 'method') renderMethod();
+  if (aView === 'partner') renderPartnerSummary();
+  if (aView === 'tax') renderTax();
+  applyZoom();
+}
+document.getElementById('y-prev').addEventListener('click', () => { yFY--; renderAnalysis(); });
+document.getElementById('y-next').addEventListener('click', () => { yFY++; renderAnalysis(); });
+
+// 年の中で金額がある科目を、区分ごとにマスタの順で
+function usedCats(byCat, list, type) {
+  return Object.keys(byCat).filter(id => byCat[id] && ((catById(id) || {}).type || (list.find(e => e.categoryId === id) || {}).type) === type)
+    .sort((a, b) => catOrder(a) - catOrder(b));
+}
+function monthlyData(fy) {
+  const { months, from, to } = fyRange(fy);
+  const list = entriesBetween(from, to);
+  const per = {};
+  months.forEach(m => { per[m] = tally(list.filter(e => e.date.slice(0, 7) === m)); });
+  const all = tally(list);
+  return { months, list, per, all, incIds: usedCats(all.byCat, list, 'income'), expIds: usedCats(all.byCat, list, 'expense') };
+}
+function renderMonthly() {
+  const D = monthlyData(yFY);
+  const mLabel = m => parseInt(m.slice(5), 10) + '月';
+  const chartEl = document.getElementById('m-chart');
+  chartEl.innerHTML = D.list.length ? barChart({ width: chartEl.clientWidth, labels: D.months.map(mLabel), title: '月ごとの収入と支出',
+    tipTitle: i => D.months[i].slice(0, 4) + '年' + mLabel(D.months[i]),
+    tipExtra: i => `<div>差引 ${yen(D.per[D.months[i]].net)}</div>`,
+    series: [{ name: '収入', color: 'var(--c-inc)', values: D.months.map(m => D.per[m].income) }, { name: '支出', color: 'var(--c-exp)', values: D.months.map(m => D.per[m].expense) }]
+  }) : '<div class="empty-state">この年の記録はありません</div>';
+  const wrap = document.getElementById('m-table');
+  if (!D.list.length) { wrap.innerHTML = ''; return; }
+  const cell = (v, cls) => `<td class="num ${cls || ''} ${v < 0 ? 'neg' : ''}">${v ? yen(v) : '-'}</td>`;
+  const row = (label, cls, get, valCls) => `<tr class="${cls}"><td class="col-first">${escapeHtml(label)}</td>${D.months.map(m => cell(get(D.per[m]), valCls)).join('')}<td class="col-last num">${get(D.all) ? yen(get(D.all)) : '-'}</td></tr>`;
+  const rows = [];
+  rows.push(row('収入合計', 'row-strong', t => t.income, 'inc'));
+  D.incIds.forEach(id => rows.push(row(catName(id), 'row-sub', t => t.byCat[id] || 0)));
+  rows.push(row('支出合計', 'row-strong', t => t.expense, 'exp'));
+  D.expIds.forEach(id => rows.push(row(catName(id), 'row-sub', t => t.byCat[id] || 0)));
+  rows.push(row('差引(収入−支出)', 'row-net', t => t.net));
+  wrap.innerHTML = `<table class="fixed-table">
+    <colgroup><col style="width:170px">${D.months.map(() => '<col style="width:100px">').join('')}<col style="width:120px"></colgroup>
+    <thead><tr><th class="col-first">科目</th>${D.months.map(m => `<th class="num">${mLabel(m)}</th>`).join('')}<th class="col-last num">年計</th></tr></thead>
+    <tbody>${rows.join('')}</tbody></table>`;
+}
+
+function renderCategory() {
+  const { months, from, to } = fyRange(yFY);
+  const sel = document.getElementById('c-month');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">1年分</option>' + months.map(m => `<option value="${m}">${m.slice(0, 4)}年${parseInt(m.slice(5), 10)}月</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  const list = entriesBetween(from, to).filter(e => !sel.value || e.date.slice(0, 7) === sel.value);
+  const t = tally(list);
+  const items = type => usedCats(t.byCat, list, type)
+    .map(id => ({ label: catName(id), value: t.byCat[id], share: share(t.byCat[id], type === 'income' ? t.income : t.expense) }))
+    .sort((a, b) => b.value - a.value);
+  const e = items('expense'), i = items('income');
+  document.getElementById('c-exp').innerHTML = e.length ? hbarChart(e, 'var(--c-exp)') : '<div class="empty-state">記録はありません</div>';
+  document.getElementById('c-inc').innerHTML = i.length ? hbarChart(i, 'var(--c-inc)') : '<div class="empty-state">記録はありません</div>';
+}
+document.getElementById('c-month').addEventListener('change', renderCategory);
+
+// ----- 支払い方法別 -----
+function usedMethods(byMethod) {
+  return Object.keys(byMethod).sort((a, b) => methodOrder(a) - methodOrder(b));
+}
+function renderMethod() {
+  const { months, from, to } = fyRange(yFY);
+  const sel = document.getElementById('p-month');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">1年分</option>' + months.map(m => `<option value="${m}">${m.slice(0, 4)}年${parseInt(m.slice(5), 10)}月</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  const all = entriesBetween(from, to);
+  const list = all.filter(e => !sel.value || e.date.slice(0, 7) === sel.value);
+  const t = tally(list);
+  const ids = usedMethods(t.byMethod);
+  const wrap = document.getElementById('p-table');
+  if (!ids.length) {
+    wrap.innerHTML = '<div class="empty-state">記録はありません</div>';
+    document.getElementById('p-chart').innerHTML = '';
+  } else {
+    wrap.innerHTML = `<table class="fixed-table">
+      <colgroup><col style="width:140px"><col style="width:110px"><col style="width:110px"><col style="width:110px"><col style="width:70px"></colgroup>
+      <thead><tr><th class="col-first">支払い方法</th><th class="num">入ってきた</th><th class="num">出ていった</th><th class="num">差引</th><th class="num">件数</th></tr></thead>
+      <tbody>${ids.map(id => { const m = t.byMethod[id], net = m.income - m.expense; return `<tr class="clickable" data-method="${id || '__none'}"><td class="col-first left">${escapeHtml(methodName(id))}</td><td class="num inc">${m.income ? yen(m.income) : '-'}</td><td class="num exp">${m.expense ? yen(m.expense) : '-'}</td><td class="num ${net < 0 ? 'neg' : ''}">${yen(net)}</td><td class="num">${m.count}件</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr><td class="col-first">合計</td><td class="num inc">${yen(t.income)}</td><td class="num exp">${yen(t.expense)}</td><td class="num">${yen(t.net)}</td><td class="num">${t.count}件</td></tr></tfoot>
+    </table><p class="hint" style="margin:8px 0 0;">行を押すと、その方法の明細を開きます</p>`;
+    wrap.querySelectorAll('tr[data-method]').forEach(tr => tr.addEventListener('click', () => {
+      const mo = sel.value || todayStr().slice(0, 7);
+      [lYear, lMonth] = mo.split('-').map(Number);
+      goTab('input');
+      document.getElementById('lf-type').value = '';
+      document.getElementById('lf-cat').value = '';
+      document.getElementById('lf-q').value = '';
+      renderList();
+      document.getElementById('lf-method').value = tr.dataset.method;
+      renderList();
+      document.getElementById('l-title').scrollIntoView({ behavior: 'smooth' });
+    }));
+    const items = ids.filter(id => t.byMethod[id].expense).map(id => ({ label: methodName(id), value: t.byMethod[id].expense, share: share(t.byMethod[id].expense, t.expense) })).sort((a, b) => b.value - a.value);
+    document.getElementById('p-chart').innerHTML = items.length ? hbarChart(items, 'var(--c-exp)') : '<div class="empty-state">支出の記録はありません</div>';
+  }
+  // 月×支払い方法(支出)
+  const yearT = tally(all);
+  const mids = usedMethods(yearT.byMethod).filter(id => yearT.byMethod[id].expense);
+  const mt = document.getElementById('p-month-table');
+  if (!mids.length) { mt.innerHTML = '<div class="empty-state">この年の支出はありません</div>'; return; }
+  const per = {};
+  months.forEach(m => { per[m] = tally(all.filter(e => e.date.slice(0, 7) === m)); });
+  const mLabel = m => parseInt(m.slice(5), 10) + '月';
+  const v = (tt, id) => (tt.byMethod[id] || {}).expense || 0;
+  mt.innerHTML = `<table class="fixed-table">
+    <colgroup><col style="width:140px">${months.map(() => '<col style="width:96px">').join('')}<col style="width:116px"></colgroup>
+    <thead><tr><th class="col-first">支払い方法</th>${months.map(m => `<th class="num">${mLabel(m)}</th>`).join('')}<th class="col-last num">年計</th></tr></thead>
+    <tbody>${mids.map(id => `<tr><td class="col-first left">${escapeHtml(methodName(id))}</td>${months.map(m => `<td class="num">${v(per[m], id) ? yen(v(per[m], id)) : '-'}</td>`).join('')}<td class="col-last num">${yen(v(yearT, id))}</td></tr>`).join('')}
+    <tr class="row-net"><td class="col-first">支出合計</td>${months.map(m => `<td class="num">${per[m].expense ? yen(per[m].expense) : '-'}</td>`).join('')}<td class="col-last num">${yen(yearT.expense)}</td></tr></tbody></table>`;
+}
+// ----- 取引先別 -----
+function renderPartnerSummary() {
+  const { months, from, to } = fyRange(yFY);
+  const sel = document.getElementById('g-month');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">1年分</option>' + months.map(m => `<option value="${m}">${m.slice(0, 4)}年${parseInt(m.slice(5), 10)}月</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  const list = entriesBetween(from, to).filter(e => !sel.value || e.date.slice(0, 7) === sel.value);
+  const g = {};
+  list.forEach(e => {
+    const name = payeeOf(e).trim() || '(取引先なし)';
+    if (!g[name]) g[name] = { name, income: 0, expense: 0, count: 0, registered: !!partnerByName(name) };
+    g[name][e.type === 'income' ? 'income' : 'expense'] += entryAmount(e);
+    g[name].count++;
+  });
+  const rows = Object.values(g).sort((a, b) => (b.income + b.expense) - (a.income + a.expense));
+  const wrap = document.getElementById('g-table');
+  if (!rows.length) {
+    wrap.innerHTML = '<div class="empty-state">記録はありません</div>';
+    document.getElementById('g-exp').innerHTML = ''; document.getElementById('g-inc').innerHTML = '';
+    return;
+  }
+  const t = tally(list);
+  wrap.innerHTML = `<table class="fixed-table">
+    <colgroup><col style="width:160px"><col style="width:110px"><col style="width:110px"><col style="width:70px"></colgroup>
+    <thead><tr><th class="col-first">取引先</th><th class="num">入ってきた</th><th class="num">出ていった</th><th class="num">件数</th></tr></thead>
+    <tbody>${rows.map(r => `<tr class="clickable" data-name="${escapeHtml(r.name)}"><td class="col-first left">${escapeHtml(r.name)}${r.registered ? '' : ' <span class="hint">未登録</span>'}</td><td class="num inc">${r.income ? yen(r.income) : '-'}</td><td class="num exp">${r.expense ? yen(r.expense) : '-'}</td><td class="num">${r.count}件</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td class="col-first">合計</td><td class="num inc">${yen(t.income)}</td><td class="num exp">${yen(t.expense)}</td><td class="num">${t.count}件</td></tr></tfoot>
+  </table><p class="hint" style="margin:8px 0 0;">行を押すと、その取引先の明細を開きます</p>`;
+  wrap.querySelectorAll('tr[data-name]').forEach(tr => tr.addEventListener('click', () => {
+    if (tr.dataset.name === '(取引先なし)') return;
+    const mo = sel.value || todayStr().slice(0, 7);
+    [lYear, lMonth] = mo.split('-').map(Number);
+    goTab('input');
+    document.getElementById('lf-type').value = ''; document.getElementById('lf-cat').value = ''; document.getElementById('lf-method').value = '';
+    document.getElementById('lf-q').value = tr.dataset.name;
+    renderList();
+    document.getElementById('l-title').scrollIntoView({ behavior: 'smooth' });
+  }));
+  const bars = (key, total) => rows.filter(r => r[key] && r.name !== '(取引先なし)').slice(0, 10).map(r => ({ label: r.name, value: r[key], share: share(r[key], total) }));
+  const e = bars('expense', t.expense), i = bars('income', t.income);
+  document.getElementById('g-exp').innerHTML = e.length ? hbarChart(e, 'var(--c-exp)') : '<div class="empty-state">記録はありません</div>';
+  document.getElementById('g-inc').innerHTML = i.length ? hbarChart(i, 'var(--c-inc)') : '<div class="empty-state">記録はありません</div>';
+}
+document.getElementById('g-month').addEventListener('change', () => { renderPartnerSummary(); applyZoom(); });
+document.getElementById('p-month').addEventListener('change', () => { renderMethod(); applyZoom(); });
+
+function renderTax() {
+  const { from, to } = fyRange(yFY);
+  const T = taxLines(entriesBetween(from, to));
+  const wrap = document.getElementById('t-table');
+  if (!T.inc.length && !T.exp.length) { wrap.innerHTML = '<div class="empty-state">この年の記録はありません</div>'; return; }
+  const line = g => `<tr class="row-sub"><td class="col-first">${escapeHtml(g.line)}</td><td class="num">${yen(g.biz)}</td><td class="num">${yen(g.total)}</td><td class="left" style="white-space:normal;">${escapeHtml(g.notes.join('、'))}</td></tr>`;
+  wrap.innerHTML = `<table class="fixed-table">
+    <colgroup><col style="width:130px"><col style="width:120px"><col style="width:110px"><col style="width:240px"></colgroup>
+    <thead><tr><th class="col-first">決算書の科目</th><th class="num">申告に使う額</th><th class="num">帳簿の合計</th><th>内訳・按分</th></tr></thead>
+    <tbody>
+      <tr class="row-strong"><td class="col-first">収入金額</td><td class="num inc">${yen(T.incTotal)}</td><td class="num">${yen(T.bookIncome)}</td><td></td></tr>
+      ${T.inc.map(line).join('')}
+      <tr class="row-strong"><td class="col-first">経費</td><td class="num exp">${yen(T.expTotal)}</td><td class="num">${yen(T.bookExpense)}</td><td></td></tr>
+      ${T.exp.map(line).join('')}
+      <tr class="row-net"><td class="col-first">差引(所得の目安)</td><td class="num ${T.net < 0 ? 'neg' : ''}">${yen(T.net)}</td><td class="num"></td><td class="left hint">控除前の金額</td></tr>
+    </tbody></table>`;
+}
+
+// ===== freee用CSV =====
+// freee会計「取引データのインポート」のテンプレートと同じ列の並び
+const FREEE_HEADER = ['収支区分', '管理番号', '発生日', '決済期日', '取引先コード', '取引先', '勘定科目', '税区分', '金額', '税計算区分', '税額', '備考', '品目', '部門', 'メモタグ', 'セグメント1', 'セグメント2', 'セグメント3', '決済日', '決済口座', '決済金額'];
+function freeeSettings() { if (!settings.freee) settings.freee = {}; const f = settings.freee; f.accounts = f.accounts || {}; f.taxes = f.taxes || {}; f.wallets = f.wallets || {}; return f; }
+function freeeDefaultAccount(c) {
+  if (!c) return '';
+  const line = catLine(c);
+  if (c.type === 'income') return line === '販売金額' ? '売上高' : line === '家事消費・事業消費金額' ? '家事消費等' : line;
+  return line;
+}
+// 農園でよくある取引の税区分(初期値)。違うときはマスタで直す
+function freeeDefaultTax(c) {
+  if (!c) return '';
+  const n = c.name, line = catLine(c);
+  if (c.type === 'income') {
+    if (/補助金|交付金|共済金|保険金/.test(n)) return '対象外';
+    if (line === '販売金額' || line === '家事消費・事業消費金額') return '課税売上8%（軽）';
+    return '課税売上10%';
+  }
+  if (['租税公課', '減価償却費', '雇人費', '会費'].indexOf(line) !== -1) return '対象外';
+  if (['利子割引料', '農業共済掛金', '保険料'].indexOf(line) !== -1) return '非課仕入';
+  return '課対仕入10%';
+}
+function freeeAccount(c) { const v = c && freeeSettings().accounts[c.id]; return v || freeeDefaultAccount(c); }
+function freeeTax(c) { const v = c && freeeSettings().taxes[c.id]; return v || freeeDefaultTax(c); }
+function freeeWallet(methodId) { if (!methodId) return ''; const v = freeeSettings().wallets[methodId]; return v || methodName(methodId); }
+function freeeRows(list) {
+  const slash = d => d.replace(/-/g, '/');
+  return list.map(e => {
+    const c = catById(e.categoryId);
+    const paid = !!e.methodId;
+    return [typeLabel(e.type), '', slash(e.date), '', '', payeeOf(e), freeeAccount(c) || catName(e.categoryId), freeeTax(c), entryAmount(e), '', '', e.memo || '', '', '', '', '', '', '',
+      paid ? slash(e.date) : '', paid ? freeeWallet(e.methodId) : '', paid ? entryAmount(e) : ''];
+  });
+}
+let encodingLibPromise = null;
+function loadEncodingLib() {
+  if (window.Encoding) return Promise.resolve(true);
+  if (!encodingLibPromise) encodingLibPromise = new Promise(resolve => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/encoding-japanese/2.0.0/encoding.min.js';
+    sc.onload = () => resolve(!!window.Encoding);
+    sc.onerror = () => { encodingLibPromise = null; resolve(false); };
+    document.head.appendChild(sc);
+  });
+  return encodingLibPromise;
+}
+async function downloadFreeeCsv(from, to, label, fileKey) {
+  const list = entriesBetween(from, to);
+  if (!list.length) { showToast(label + 'の記録はありません'); return; }
+  const f = freeeSettings();
+  const done = (f.exported || []).find(x => x.key === fileKey);
+  const unpaid = list.filter(e => !e.methodId).length;
+  const msg = label + 'の取引 ' + list.length + '件を、freee用のCSVで書き出します。'
+    + (unpaid ? '\n支払い方法が未設定の ' + unpaid + '件は、freeeでは「未決済」の取引になります。' : '')
+    + (done ? '\n\n⚠ この期間は ' + done.at + ' に書き出し済みです。freeeに取り込み済みなら、もう一度取り込むと重複します。' : '');
+  if (!(await showConfirm(msg, '書き出す'))) return;
+  const q = v => { const t = String(v === undefined || v === null ? '' : v); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const text = [FREEE_HEADER].concat(freeeRows(list)).map(r => r.map(q).join(',')).join('\r\n') + '\r\n';
+  let blob;
+  if (f.encoding === 'sjis') {
+    if (!(await loadEncodingLib())) { showSaveModal('Shift_JISに変換する部品を読み込めませんでした。通信状況を確かめるか、文字コードをUTF-8にしてください', false); return; }
+    const sjis = Encoding.convert(Encoding.stringToCode(text), { to: 'SJIS', from: 'UNICODE' });
+    blob = new Blob([new Uint8Array(sjis)], { type: 'text/csv' });
+  } else {
+    blob = new Blob(['﻿' + text], { type: 'text/csv' });
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'freee取引_' + fileKey + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  // 書き出した期間を覚えておく(重複の注意に使う)
+  f.exported = (f.exported || []).filter(x => x.key !== fileKey).concat([{ key: fileKey, at: todayStr().replace(/-/g, '/') }]).slice(-60);
+  saveSettings();
+  showToast('freee用CSVを保存しました。freeeの「取引データのインポート」で取り込んでください');
+}
+document.getElementById('l-freee').addEventListener('click', () => {
+  const [from, to] = monthRange(lYear, lMonth);
+  downloadFreeeCsv(from, to, lYear + '年' + lMonth + '月', lYear + '-' + pad2(lMonth));
+});
+document.getElementById('y-freee').addEventListener('click', () => {
+  const { from, to } = fyRange(yFY);
+  downloadFreeeCsv(from, to, fyTitle(yFY), from.slice(0, 7) + '_' + to.slice(0, 7));
+});
+function renderFreeeCard() {
+  const f = freeeSettings();
+  document.getElementById('fr-enc').value = f.encoding === 'sjis' ? 'sjis' : 'utf8';
+  const catRow = c => `<tr class="${c.hidden ? 'hidden-row' : ''}"><td style="white-space:nowrap;"><span class="tag ${c.type === 'income' ? 'inc' : 'exp'}">${typeLabel(c.type)}</span>${escapeHtml(c.name)}</td>
+    <td><input class="cell-input" style="min-width:130px;" data-fr-acc="${c.id}" value="${escapeHtml(freeeAccount(c))}"></td>
+    <td><input class="cell-input" style="min-width:140px;" list="fr-tax-list" data-fr-tax="${c.id}" value="${escapeHtml(freeeTax(c))}"></td></tr>`;
+  const list = categories.filter(c => c.type === 'income').concat(categories.filter(c => c.type === 'expense'));
+  document.getElementById('fr-cats').innerHTML = list.length ? `<div style="overflow-x:auto; max-height:420px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;"><table class="master-table"><thead><tr><th>科目</th><th>freeeの勘定科目</th><th>税区分</th></tr></thead><tbody>${list.map(catRow).join('')}</tbody></table></div>` : '<div class="empty-state">科目がありません</div>';
+  document.getElementById('fr-methods').innerHTML = methods.length ? `<div style="overflow-x:auto;"><table class="master-table"><thead><tr><th>支払い方法</th><th>freeeの口座名</th></tr></thead><tbody>${methods.map(m => `<tr><td style="white-space:nowrap;">${escapeHtml(m.name)}</td><td><input class="cell-input" style="min-width:160px;" data-fr-wallet="${m.id}" value="${escapeHtml(freeeWallet(m.id))}"></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-state">支払い方法がありません</div>';
+  const save = async () => { if (await saveSettings()) showToast('保存しました'); };
+  // 空にしたら初期値に戻す
+  document.querySelectorAll('[data-fr-acc]').forEach(el => el.addEventListener('change', () => { const c = catById(el.dataset.frAcc), v = el.value.trim(); if (!v || v === freeeDefaultAccount(c)) delete f.accounts[c.id]; else f.accounts[c.id] = v; el.value = freeeAccount(c); save(); }));
+  document.querySelectorAll('[data-fr-tax]').forEach(el => el.addEventListener('change', () => { const c = catById(el.dataset.frTax), v = el.value.trim(); if (!v || v === freeeDefaultTax(c)) delete f.taxes[c.id]; else f.taxes[c.id] = v; el.value = freeeTax(c); save(); }));
+  document.querySelectorAll('[data-fr-wallet]').forEach(el => el.addEventListener('change', () => { const id = el.dataset.frWallet, v = el.value.trim(); if (!v || v === methodName(id)) delete f.wallets[id]; else f.wallets[id] = v; el.value = freeeWallet(id); save(); }));
+}
+document.getElementById('fr-enc').addEventListener('change', async e => { freeeSettings().encoding = e.target.value; if (await saveSettings()) showToast('保存しました'); });
+
+// ----- CSV(税理士さん・会計ソフト用) -----
+document.getElementById('y-csv').addEventListener('click', () => {
+  const { from, to } = fyRange(yFY);
+  const list = entriesBetween(from, to);
+  if (!list.length) { showToast('この年の記録はありません'); return; }
+  const q = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+  const lines = [['日付', '区分', '科目', '決算書の科目', '事業割合(%)', '金額', '支払い方法', '取引先', 'メモ'].map(q).join(',')];
+  list.forEach(e => {
+    const c = catById(e.categoryId);
+    lines.push([e.date.replace(/-/g, '/'), typeLabel(e.type), catName(e.categoryId), catLine(c), catRatio(c), entryAmount(e), e.methodId ? methodName(e.methodId) : '', payeeOf(e), e.memo || ''].map(q).join(','));
+  });
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'shushi_' + yFY + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSVを保存しました(Excelで開けます)');
+});
+
+// ===== 表の拡大縮小 =====
+let zoomLevel = 100;
+try { zoomLevel = parseInt(localStorage.getItem(ZOOM_KEY), 10) || 100; } catch (e) { /* ignore */ }
+function applyZoom() {
+  document.querySelectorAll('.zoom-target').forEach(el => { el.style.zoom = zoomLevel / 100; });
+  document.querySelectorAll('.zoom-label').forEach(el => { el.textContent = zoomLevel + '%'; });
+}
+function setZoom(v) { zoomLevel = Math.max(50, Math.min(150, v)); try { localStorage.setItem(ZOOM_KEY, zoomLevel); } catch (e) { /* ignore */ } applyZoom(); }
+document.querySelectorAll('.zoom-in').forEach(b => b.addEventListener('click', () => setZoom(zoomLevel + 10)));
+document.querySelectorAll('.zoom-out').forEach(b => b.addEventListener('click', () => setZoom(zoomLevel - 10)));
+document.querySelectorAll('.zoom-reset').forEach(b => b.addEventListener('click', () => setZoom(100)));
+
+// ===== マスタ =====
+function lineOptions(type, current, name) {
+  const lines = REPORT_LINES[type];
+  const custom = current && lines.indexOf(current) === -1 && current !== name ? current : null;
+  return lines.map(l => `<option value="${escapeHtml(l)}" ${l === current ? 'selected' : ''}>${escapeHtml(l)}</option>`).join('')
+    + (custom ? `<option value="${escapeHtml(custom)}" selected>${escapeHtml(custom)}</option>` : '')
+    + `<option value="" ${!current || (current === name && lines.indexOf(current) === -1) ? 'selected' : ''}>その他(科目名のまま)</option>`;
+}
+function renderMasterList(type) {
+  const wrap = document.getElementById('ms-' + type);
+  const list = categories.filter(c => c.type === type);
+  if (!list.length) { wrap.innerHTML = '<div class="empty-state">科目がありません</div>'; return; }
+  const counts = {};
+  entries.forEach(e => { counts[e.categoryId] = (counts[e.categoryId] || 0) + 1; });
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="master-table"><thead><tr><th>並び順</th><th>科目の名前</th><th>確定申告での科目</th>${type === 'expense' ? '<th>事業割合(%)</th>' : ''}<th>入力欄に</th><th>記録</th><th></th></tr></thead><tbody>${
+    list.map((c, i) => `<tr class="${c.hidden ? 'hidden-row' : ''}">
+      <td style="white-space:nowrap;"><button class="btn-ghost" data-move="${c.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''}>↑</button> <button class="btn-ghost" data-move="${c.id}" data-dir="1" ${i === list.length - 1 ? 'disabled' : ''}>↓</button></td>
+      <td><input class="cell-input name" data-name="${c.id}" value="${escapeHtml(c.name)}"><div class="hint">${escapeHtml(c.hint || '')}</div></td>
+      <td><select class="cell-select" data-line="${c.id}">${lineOptions(type, c.line, c.name)}</select></td>
+      ${type === 'expense' ? `<td><input class="cell-input num ratio" type="number" inputmode="numeric" min="0" max="100" data-ratio="${c.id}" value="${catRatio(c)}"></td>` : ''}
+      <td><select class="cell-select" data-hidden="${c.id}"><option value="0" ${!c.hidden ? 'selected' : ''}>出す</option><option value="1" ${c.hidden ? 'selected' : ''}>隠す</option></select></td>
+      <td class="num hint">${counts[c.id] || 0}件</td>
+      <td class="row-actions"><button class="btn-text-danger" data-del="${c.id}">削除</button></td>
+    </tr>`).join('')
+  }</tbody></table></div>`;
+  wrap.querySelectorAll('[data-move]').forEach(b => b.addEventListener('click', () => moveCategory(type, b.dataset.move, parseInt(b.dataset.dir, 10))));
+  const upd = async (id, patch) => { const c = catById(id); Object.assign(c, patch); if (await saveRecord('category', c)) showToast('保存しました'); };
+  wrap.querySelectorAll('[data-name]').forEach(el => el.addEventListener('change', () => {
+    const c = catById(el.dataset.name), v = el.value.trim();
+    if (!v) { el.value = c.name; return; }
+    const patch = { name: v };
+    if (!c.line || c.line === c.name) patch.line = REPORT_LINES[c.type].indexOf(c.line) !== -1 ? c.line : v;
+    upd(c.id, patch);
+  }));
+  wrap.querySelectorAll('[data-line]').forEach(el => el.addEventListener('change', () => { const c = catById(el.dataset.line); upd(c.id, { line: el.value || c.name }); }));
+  wrap.querySelectorAll('[data-ratio]').forEach(el => el.addEventListener('change', () => {
+    let v = Math.round(toNum(el.value));
+    v = Math.max(0, Math.min(100, v)); el.value = v;
+    upd(el.dataset.ratio, { ratio: v });
+  }));
+  wrap.querySelectorAll('[data-hidden]').forEach(el => el.addEventListener('change', () => { upd(el.dataset.hidden, { hidden: el.value === '1' }); renderMasterList(type); }));
+  wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    const c = catById(b.dataset.del);
+    const used = counts[c.id] || 0;
+    if (used) { showSaveModal('「' + c.name + '」には記録が' + used + '件あるため削除できません。使わなくなった科目は「入力欄に:隠す」にしてください', false); return; }
+    if (!(await showConfirm('科目「' + c.name + '」を削除しますか？'))) return;
+    categories = categories.filter(x => x.id !== c.id);
+    renderMaster();
+    if (await deleteRecord('category', c.id)) showToast('削除しました');
+  }));
+}
+function renderMethodMaster() {
+  const wrap = document.getElementById('ms-method');
+  document.getElementById('mm-default').style.display = methods.length ? 'none' : '';
+  if (!methods.length) { wrap.innerHTML = '<div class="empty-state">支払い方法がありません</div>'; return; }
+  const counts = {};
+  entries.forEach(e => { if (e.methodId) counts[e.methodId] = (counts[e.methodId] || 0) + 1; });
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="master-table"><thead><tr><th>並び順</th><th>名前</th><th>入力欄に</th><th>記録</th><th></th></tr></thead><tbody>${
+    methods.map((m, i) => `<tr class="${m.hidden ? 'hidden-row' : ''}">
+      <td style="white-space:nowrap;"><button class="btn-ghost" data-mmove="${m.id}" data-dir="-1" ${i === 0 ? 'disabled' : ''}>↑</button> <button class="btn-ghost" data-mmove="${m.id}" data-dir="1" ${i === methods.length - 1 ? 'disabled' : ''}>↓</button></td>
+      <td><input class="cell-input name" data-mname="${m.id}" value="${escapeHtml(m.name)}"></td>
+      <td><select class="cell-select" data-mhidden="${m.id}"><option value="0" ${!m.hidden ? 'selected' : ''}>出す</option><option value="1" ${m.hidden ? 'selected' : ''}>隠す</option></select></td>
+      <td class="num hint">${counts[m.id] || 0}件</td>
+      <td class="row-actions"><button class="btn-text-danger" data-mdel="${m.id}">削除</button></td>
+    </tr>`).join('')
+  }</tbody></table></div>`;
+  const upd = async (id, patch) => { const m = methodById(id); Object.assign(m, patch); if (await saveRecord('method', m)) showToast('保存しました'); };
+  wrap.querySelectorAll('[data-mmove]').forEach(b => b.addEventListener('click', () => moveMethod(b.dataset.mmove, parseInt(b.dataset.dir, 10))));
+  wrap.querySelectorAll('[data-mname]').forEach(el => el.addEventListener('change', () => {
+    const m = methodById(el.dataset.mname), v = el.value.trim();
+    if (!v) { el.value = m.name; return; }
+    upd(m.id, { name: v });
+  }));
+  wrap.querySelectorAll('[data-mhidden]').forEach(el => el.addEventListener('change', () => { upd(el.dataset.mhidden, { hidden: el.value === '1' }); renderMethodMaster(); }));
+  wrap.querySelectorAll('[data-mdel]').forEach(b => b.addEventListener('click', async () => {
+    const m = methodById(b.dataset.mdel);
+    const used = counts[m.id] || 0;
+    if (used) { showSaveModal('「' + m.name + '」には記録が' + used + '件あるため削除できません。使わなくなった方法は「入力欄に:隠す」にしてください', false); return; }
+    if (!(await showConfirm('支払い方法「' + m.name + '」を削除しますか？'))) return;
+    methods = methods.filter(x => x.id !== m.id);
+    renderMethodMaster();
+    if (await deleteRecord('method', m.id)) showToast('削除しました');
+  }));
+}
+async function moveMethod(id, dir) {
+  const i = methods.findIndex(x => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= methods.length) return;
+  const a = methods[i], b = methods[j];
+  const ta = a.sortOrder || 0, tb = b.sortOrder || 0;
+  if (ta === tb) { a.sortOrder = tb + dir; } else { a.sortOrder = tb; b.sortOrder = ta; }
+  sortMasters();
+  renderMethodMaster();
+  await saveRecord('method', a);
+  await saveRecord('method', b);
+}
+function defaultMethodRecords() {
+  const base = Date.now().toString(36);
+  return DEFAULT_METHODS.map((name, i) => ({ id: base + 'm' + i, name, sortOrder: i + 1 }));
+}
+document.getElementById('mm-add').addEventListener('click', async () => {
+  const name = document.getElementById('mm-name').value.trim();
+  if (!name) { showToast('支払い方法の名前を入力してください'); return; }
+  if (methods.some(m => m.name === name)) { showToast('同じ名前の支払い方法がすでにあります'); return; }
+  const m = { id: uid(), name, sortOrder: methods.reduce((x, y) => Math.max(x, y.sortOrder || 0), 0) + 1 };
+  methods.push(m);
+  document.getElementById('mm-name').value = '';
+  renderMethodMaster();
+  const ok = await saveRecord('method', m);
+  showSaveModal(ok ? '支払い方法「' + name + '」を追加しました' : '保存に失敗しました。もう一度お試しください', ok);
+});
+document.getElementById('mm-default').addEventListener('click', async () => {
+  if (methods.length) return;
+  const list = defaultMethodRecords();
+  methods = list;
+  renderMethodMaster();
+  try {
+    await sheetStorage.batch('setBatch', list.map(m => [keyOf('method', m), JSON.stringify(m)]));
+    saveToCache();
+    showSaveModal('支払い方法を' + list.length + 'つ作成しました。名前は口座名やカード名に変えられます', true);
+  } catch (e) {
+    if (!e.unauthorized) showSaveModal('作成に失敗しました。もう一度お試しください', false);
+    methods = [];
+    renderMethodMaster();
+  }
+});
+function nextPartnerOrder() { return partners.reduce((x, y) => Math.max(x, y.sortOrder || 0), 0) + 1; }
+function renderPartnerMaster() {
+  const wrap = document.getElementById('ms-partner');
+  const q = document.getElementById('mp-q').value.trim();
+  const counts = {};
+  entries.forEach(e => { const n = payeeOf(e); if (n) counts[n] = (counts[n] || 0) + 1; });
+  // まだ登録していない、これまでの入力の取引先
+  const unreg = Object.keys(counts).filter(n => !partnerByName(n));
+  const imp = document.getElementById('mp-import');
+  imp.style.display = unreg.length ? '' : 'none';
+  imp.textContent = 'これまでの入力にある取引先(' + unreg.length + '件)をまとめて登録する';
+  document.getElementById('mp-cat').innerHTML = catOptionsAll(document.getElementById('mp-cat').value);
+  document.getElementById('mp-method').innerHTML = methodOptions(document.getElementById('mp-method').value, '決めない');
+  const list = partners.filter(x => !q || x.name.indexOf(q) !== -1);
+  if (!partners.length) { wrap.innerHTML = '<div class="empty-state">取引先はまだありません。下の欄か、入力画面の「＋取引先に登録する」から登録できます</div>'; return; }
+  if (!list.length) { wrap.innerHTML = '<div class="empty-state">見つかりません</div>'; return; }
+  wrap.innerHTML = `<div style="overflow-x:auto;"><table class="master-table"><thead><tr><th>並び順</th><th>名前</th><th>よく使う科目</th><th>支払い方法</th><th>メモ</th><th>入力欄に</th><th>記録</th><th></th></tr></thead><tbody>${
+    list.map(x => { const i = partners.indexOf(x); return `<tr class="${x.hidden ? 'hidden-row' : ''}">
+      <td style="white-space:nowrap;"><button class="btn-ghost" data-gmove="${x.id}" data-dir="-1" ${i === 0 || q ? 'disabled' : ''}>↑</button> <button class="btn-ghost" data-gmove="${x.id}" data-dir="1" ${i === partners.length - 1 || q ? 'disabled' : ''}>↓</button></td>
+      <td><input class="cell-input name" data-gname="${x.id}" value="${escapeHtml(x.name)}"></td>
+      <td><select class="cell-select" data-gcat="${x.id}">${catOptionsAll(x.categoryId)}</select></td>
+      <td><select class="cell-select" data-gmethod="${x.id}">${methodOptions(x.methodId, '決めない')}</select></td>
+      <td><input class="cell-input" style="min-width:140px;" data-gmemo="${x.id}" value="${escapeHtml(x.memo || '')}"></td>
+      <td><select class="cell-select" data-ghidden="${x.id}"><option value="0" ${!x.hidden ? 'selected' : ''}>出す</option><option value="1" ${x.hidden ? 'selected' : ''}>隠す</option></select></td>
+      <td class="num hint">${counts[x.name] || 0}件</td>
+      <td class="row-actions"><button class="btn-text-danger" data-gdel="${x.id}">削除</button></td>
+    </tr>`; }).join('')
+  }</tbody></table></div>`;
+  const upd = async (id, patch) => { const x = partnerById(id); Object.assign(x, patch); if (await saveRecord('partner', x)) showToast('保存しました'); };
+  wrap.querySelectorAll('[data-gmove]').forEach(b => b.addEventListener('click', () => movePartner(b.dataset.gmove, parseInt(b.dataset.dir, 10))));
+  wrap.querySelectorAll('[data-gname]').forEach(el => el.addEventListener('change', () => {
+    const x = partnerById(el.dataset.gname), v = el.value.trim();
+    if (!v || partners.some(o => o !== x && o.name === v)) { el.value = x.name; showToast(v ? '同じ名前の取引先がすでにあります' : '名前を入力してください'); return; }
+    // 名前を変えても、登録済みの取引先として入力した記録は新しい名前で表示される
+    upd(x.id, { name: v });
+  }));
+  wrap.querySelectorAll('[data-gcat]').forEach(el => el.addEventListener('change', () => upd(el.dataset.gcat, { categoryId: el.value })));
+  wrap.querySelectorAll('[data-gmethod]').forEach(el => el.addEventListener('change', () => upd(el.dataset.gmethod, { methodId: el.value })));
+  wrap.querySelectorAll('[data-gmemo]').forEach(el => el.addEventListener('change', () => upd(el.dataset.gmemo, { memo: el.value.trim() })));
+  wrap.querySelectorAll('[data-ghidden]').forEach(el => el.addEventListener('change', () => { upd(el.dataset.ghidden, { hidden: el.value === '1' }); renderPartnerMaster(); }));
+  wrap.querySelectorAll('[data-gdel]').forEach(b => b.addEventListener('click', async () => {
+    const x = partnerById(b.dataset.gdel);
+    const used = counts[x.name] || 0;
+    if (!(await showConfirm('取引先「' + x.name + '」を削除しますか？' + (used ? '\nこれまでの記録(' + used + '件)は消えず、取引先の名前もそのまま残ります。' : '')))) return;
+    // 記録には名前を書き残しておく
+    const touched = entries.filter(e => e.payeeId === x.id);
+    touched.forEach(e => { e.payee = x.name; e.payeeId = ''; });
+    partners = partners.filter(o => o.id !== x.id);
+    renderPartnerMaster();
+    let ok = await deleteRecord('partner', x.id);
+    if (touched.length) { try { await sheetStorage.batch('setBatch', touched.map(e => [keyOf('entry', e), JSON.stringify(e)])); saveToCache(); } catch (err) { ok = false; } }
+    if (ok) showToast('削除しました');
+  }));
+}
+async function movePartner(id, dir) {
+  const i = partners.findIndex(x => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= partners.length) return;
+  const a = partners[i], b = partners[j];
+  const ta = a.sortOrder || 0, tb = b.sortOrder || 0;
+  if (ta === tb) { a.sortOrder = tb + dir; } else { a.sortOrder = tb; b.sortOrder = ta; }
+  sortMasters();
+  renderPartnerMaster();
+  await saveRecord('partner', a);
+  await saveRecord('partner', b);
+}
+document.getElementById('mp-q').addEventListener('input', renderPartnerMaster);
+document.getElementById('mp-add').addEventListener('click', async () => {
+  const name = document.getElementById('mp-name').value.trim();
+  if (!name) { showToast('取引先の名前を入力してください'); return; }
+  if (partnerByName(name)) { showToast('同じ名前の取引先がすでにあります'); return; }
+  const x = { id: uid(), name, categoryId: document.getElementById('mp-cat').value, methodId: document.getElementById('mp-method').value, memo: document.getElementById('mp-memo').value.trim(), sortOrder: nextPartnerOrder() };
+  partners.push(x);
+  ['mp-name', 'mp-memo'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('mp-cat').value = ''; document.getElementById('mp-method').value = '';
+  renderPartnerMaster();
+  const ok = await saveRecord('partner', x);
+  showSaveModal(ok ? '取引先「' + name + '」を追加しました' : '保存に失敗しました。もう一度お試しください', ok);
+});
+document.getElementById('mp-import').addEventListener('click', async () => {
+  const last = {};
+  sortEntries(entries).forEach(e => { const n = payeeOf(e).trim(); if (n && !partnerByName(n)) last[n] = e; }); // いちばん新しい記録の科目・方法を使う
+  const names = Object.keys(last);
+  if (!names.length) return;
+  if (!(await showConfirm(names.length + '件の取引先を登録します。\n「よく使う科目」「支払い方法」は、それぞれいちばん新しい記録の内容にします。\n' + names.slice(0, 15).join('、') + (names.length > 15 ? ' ほか' : ''), '登録する'))) return;
+  let order = nextPartnerOrder();
+  const add = names.map(n => ({ id: uid() + order, name: n, categoryId: last[n].categoryId || '', methodId: last[n].methodId || '', memo: '', sortOrder: order++ }));
+  partners = partners.concat(add);
+  // 記録を登録済みの取引先につなぐ
+  const touched = [];
+  entries.forEach(e => { if (!e.payeeId) { const x = partnerByName(e.payee); if (x) { e.payeeId = x.id; touched.push(e); } } });
+  const prog = document.getElementById('progress-modal');
+  prog.style.display = 'flex';
+  try {
+    await sheetStorage.batch('setBatch', add.map(x => [keyOf('partner', x), JSON.stringify(x)]).concat(touched.map(e => [keyOf('entry', e), JSON.stringify(e)])),
+      (d, a) => { document.getElementById('progress-message').textContent = d + ' / ' + a + ' 件'; });
+    saveToCache();
+    prog.style.display = 'none';
+    showSaveModal('取引先を' + add.length + '件登録しました', true);
+  } catch (err) {
+    prog.style.display = 'none';
+    if (!err.unauthorized) showSaveModal('途中で失敗しました。「最新に更新」を押してから、もう一度お試しください', false);
+  }
+  renderPartnerMaster();
+});
+
+// ----- 販売管理アプリの取引先を取り込む -----
+document.getElementById('mp-nouka-btn').addEventListener('click', () => document.getElementById('mp-nouka-input').click());
+document.getElementById('mp-nouka-input').addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(await file.text()); } catch (e) { showSaveModal('ファイルを読み込めませんでした。販売管理のバックアップファイルか確認してください', false); return; }
+  if (!data || !Array.isArray(data.customers) || data.appName === APP_NAME) {
+    showSaveModal('このファイルは販売管理のバックアップではないようです。販売管理アプリのマスタにある「バックアップをダウンロード」で保存したファイルを選んでください', false); return;
+  }
+  const custs = data.customers.filter(c => c && c.id && String(c.name || '').trim())
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  if (!custs.length) { showSaveModal('このファイルには取引先が入っていませんでした', false); return; }
+  const saleCat = categories.find(c => c.type === 'income' && c.name === '販売(取引先への出荷)' && !c.hidden)
+    || categories.find(c => c.type === 'income' && catLine(c) === '販売金額' && !c.hidden);
+  const bank = methods.find(m => m.name === '銀行口座' && !m.hidden);
+  const toAdd = [], toUpdate = [], skipped = [];
+  let order = nextPartnerOrder();
+  custs.forEach(c => {
+    const name = String(c.name).trim();
+    const src = 'nouka:' + c.id;
+    const linked = partners.find(x => x.sourceId === src);
+    if (linked) {
+      // 販売管理で名前が変わっていたら合わせる(同じ名前の別の取引先がある場合はそのまま)
+      if (linked.name !== name && !partnerByName(name)) toUpdate.push({ x: linked, name });
+      else skipped.push(name);
+      return;
+    }
+    const same = partnerByName(name);
+    if (same) {
+      if (!same.sourceId) { same.sourceId = src; toUpdate.push({ x: same, name }); } else skipped.push(name);
+      return;
+    }
+    toAdd.push({
+      id: uid() + order, name, sourceId: src,
+      categoryId: saleCat ? saleCat.id : '',
+      methodId: c.needsInvoice && bank ? bank.id : '',
+      memo: String(c.memo || '').trim(),
+      sortOrder: order++
+    });
+  });
+  const realUpdates = toUpdate.filter(u => u.x.name !== u.name);
+  if (!toAdd.length && !realUpdates.length && !toUpdate.length) { showSaveModal('販売管理の取引先(' + custs.length + '件)は、すべて登録済みです', true); return; }
+  const lines = [];
+  if (toAdd.length) lines.push('新しく追加: ' + toAdd.length + '件\n' + toAdd.slice(0, 20).map(x => '・' + x.name).join('\n') + (toAdd.length > 20 ? '\n ほか' : ''));
+  if (realUpdates.length) lines.push('名前を変更: ' + realUpdates.length + '件\n' + realUpdates.map(u => '・' + u.x.name + ' → ' + u.name).join('\n'));
+  if (skipped.length || toUpdate.length - realUpdates.length) lines.push('すでに登録済み: ' + (skipped.length + toUpdate.length - realUpdates.length) + '件');
+  lines.push('追加する取引先の「よく使う科目」は「' + (saleCat ? saleCat.name : '決めない') + '」にします。' + (bank ? '請求書を出している取引先は、支払い方法を「銀行口座」にします。' : ''));
+  if (!(await showConfirm(lines.join('\n\n'), '取り込む'))) return;
+  toUpdate.forEach(u => { u.x.name = u.name; });
+  partners = partners.concat(toAdd);
+  sortMasters();
+  // 名前が同じで、まだ取引先につながっていない記録をつなぐ
+  const touched = [];
+  entries.forEach(e => { if (!e.payeeId) { const x = partnerByName(e.payee); if (x) { e.payeeId = x.id; touched.push(e); } } });
+  const pairs = toAdd.concat(toUpdate.map(u => u.x)).map(x => [keyOf('partner', x), JSON.stringify(x)])
+    .concat(touched.map(e => [keyOf('entry', e), JSON.stringify(e)]));
+  const prog = document.getElementById('progress-modal');
+  prog.style.display = 'flex';
+  try {
+    await sheetStorage.batch('setBatch', pairs, (d, a) => { document.getElementById('progress-message').textContent = d + ' / ' + a + ' 件'; });
+    saveToCache();
+    prog.style.display = 'none';
+    showSaveModal('販売管理から取引先を取り込みました(追加 ' + toAdd.length + '件' + (realUpdates.length ? '・名前変更 ' + realUpdates.length + '件' : '') + ')', true);
+  } catch (e) {
+    prog.style.display = 'none';
+    if (!e.unauthorized) showSaveModal('途中で失敗しました。「最新に更新」を押してから、もう一度同じファイルで取り込んでください(重複はしません)', false);
+  }
+  renderPartnerMaster();
+  renderPayeeList();
+});
+
+// おすすめの科目(最初に入っていた科目)のうち、ないものを追加する
+document.getElementById('mn-recommend').addEventListener('click', async () => {
+  const missing = DEFAULT_CATEGORIES.filter(d => !categories.some(c => c.type === d.type && c.name === d.name));
+  if (!missing.length) { showToast('おすすめの科目はすべてそろっています'); return; }
+  if (!(await showConfirm('次の' + missing.length + '個の科目を追加します。\n' + missing.map(d => d.name).join('、'), '追加する'))) return;
+  let order = nextSortOrder();
+  const add = missing.map(d => Object.assign({ id: uid() + order, sortOrder: order++ }, d, d.type === 'expense' ? { ratio: 100 } : {}));
+  categories = categories.concat(add);
+  sortMasters();
+  renderMaster();
+  try {
+    await sheetStorage.batch('setBatch', add.map(c => [keyOf('category', c), JSON.stringify(c)]));
+    saveToCache();
+    showSaveModal('科目を' + add.length + '個追加しました(並び順は一番下です)', true);
+  } catch (e) { if (!e.unauthorized) showSaveModal('追加に失敗しました。「最新に更新」を押してから、もう一度お試しください', false); }
+});
+
+function renderMaster() {
+  renderPartnerMaster();
+  renderFreeeCard();
+  renderMasterList('expense');
+  renderMasterList('income');
+  renderMethodMaster();
+  document.getElementById('mn-line').innerHTML = lineOptions(document.getElementById('mn-type').value, '', '');
+  document.getElementById('mn-ratio').disabled = document.getElementById('mn-type').value === 'income';
+  const fy = document.getElementById('set-fy');
+  fy.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${i + 1 === fyStart() ? 'selected' : ''}>${i + 1}月</option>`).join('');
+}
+document.getElementById('mn-type').addEventListener('change', () => {
+  document.getElementById('mn-line').innerHTML = lineOptions(document.getElementById('mn-type').value, '', '');
+  document.getElementById('mn-ratio').disabled = document.getElementById('mn-type').value === 'income';
+});
+// 並べ替え:入れ替える2件だけを保存し、先に画面を更新する
+async function moveCategory(type, id, dir) {
+  const list = categories.filter(c => c.type === type);
+  const i = list.findIndex(x => x.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  const a = list[i], b = list[j];
+  const ta = a.sortOrder || 0, tb = b.sortOrder || 0;
+  if (ta === tb) { a.sortOrder = tb + dir; } else { a.sortOrder = tb; b.sortOrder = ta; }
+  sortMasters();
+  renderMaster();
+  await saveRecord('category', a);
+  await saveRecord('category', b);
+}
+function nextSortOrder() { return categories.reduce((m, x) => Math.max(m, x.sortOrder || 0), 0) + 1; }
+document.getElementById('mn-add').addEventListener('click', async () => {
+  const type = document.getElementById('mn-type').value;
+  const name = document.getElementById('mn-name').value.trim();
+  if (!name) { showToast('科目の名前を入力してください'); return; }
+  if (categories.some(c => c.type === type && c.name === name)) { showToast('同じ名前の科目がすでにあります'); return; }
+  const c = { id: uid(), type, name, line: document.getElementById('mn-line').value || name, hint: '', sortOrder: nextSortOrder() };
+  if (type === 'expense') c.ratio = Math.max(0, Math.min(100, Math.round(toNum(document.getElementById('mn-ratio').value || 100))));
+  categories.push(c);
+  document.getElementById('mn-name').value = '';
+  document.getElementById('mn-ratio').value = 100;
+  renderMaster();
+  const ok = await saveRecord('category', c);
+  showSaveModal(ok ? '科目「' + name + '」を追加しました' : '保存に失敗しました。もう一度お試しください', ok);
+});
+document.getElementById('set-fy').addEventListener('change', async e => {
+  settings.fyStart = parseInt(e.target.value, 10);
+  yFY = fiscalYearOf(todayStr());
+  if (await saveSettings()) showToast('年の始まりを' + settings.fyStart + '月にしました');
+});
+
+// 最初の科目と支払い方法(データが空のとき、自動で作る)
+let creatingDefaults = false;
+async function createDefaults(showMessage) {
+  if (creatingDefaults || categories.length > 0) return true;
+  creatingDefaults = true;
+  const base = Date.now().toString(36);
+  const addCats = DEFAULT_CATEGORIES.map((d, i) => Object.assign({ id: base + 'c' + i, sortOrder: i + 1 }, d, d.type === 'expense' ? { ratio: 100 } : {}));
+  const addMethods = methods.length ? [] : defaultMethodRecords();
+  categories = addCats;
+  methods = methods.concat(addMethods);
+  let ok = true;
+  try {
+    await sheetStorage.batch('setBatch', addCats.map(c => [keyOf('category', c), JSON.stringify(c)]).concat(addMethods.map(m => [keyOf('method', m), JSON.stringify(m)])));
+    saveToCache();
+    if (showMessage) showSaveModal('科目を' + addCats.length + '個' + (addMethods.length ? '、支払い方法を' + addMethods.length + 'つ' : '') + '用意しました。あとからマスタで追加・削除できます', true);
+    else showToast('科目と支払い方法を用意しました(マスタで追加・削除できます)');
+  } catch (e) {
+    ok = false;
+    if (!e.unauthorized) showToast('科目を作れませんでした。通信状況を確かめてください');
+    categories = [];
+    methods = methods.filter(m => addMethods.indexOf(m) === -1);
+  }
+  creatingDefaults = false;
+  return ok;
+}
+document.getElementById('setup-default-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('setup-default-btn');
+  btn.disabled = true;
+  await createDefaults(true);
+  btn.disabled = false;
+  renderAll();
+});
+
+// ===== バックアップ・復元 =====
+document.getElementById('backup-download-btn').addEventListener('click', () => {
+  const backup = { appName: APP_NAME, version: 3, exportedAt: new Date().toISOString(), categories, entries, methods, partners, settings };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'shushi-backup_' + todayStr() + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('バックアップをダウンロードしました');
+});
+document.getElementById('backup-restore-btn').addEventListener('click', () => document.getElementById('backup-restore-input').click());
+document.getElementById('backup-restore-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(await file.text()); } catch (err) { showSaveModal('ファイルを読み込めませんでした。正しいバックアップファイルか確認してください', false); return; }
+  if (!data || data.appName !== APP_NAME || !Array.isArray(data.categories) || !Array.isArray(data.entries)) {
+    showSaveModal('このファイルは収支管理のバックアップではないようです', false); return;
+  }
+  const nc = data.categories, ne = data.entries, nm = Array.isArray(data.methods) ? data.methods : [], np = Array.isArray(data.partners) ? data.partners : [], ns = Object.assign({ fyStart: 1 }, data.settings || {});
+  const ok = await showConfirm('このファイルの内容で、今のデータを置き換えます。\n科目 ' + nc.length + '件・支払い方法 ' + nm.length + '件・取引先 ' + np.length + '件・記録 ' + ne.length + '件\n(この操作は取り消せません。不安なときは先に「バックアップをダウンロード」してください)', '置き換える');
+  if (!ok) return;
+  const newPairs = [].concat(nc.map(r => [keyOf('category', r), JSON.stringify(r)]), ne.map(r => [keyOf('entry', r), JSON.stringify(r)]), nm.map(r => [keyOf('method', r), JSON.stringify(r)]), np.map(r => [keyOf('partner', r), JSON.stringify(r)]), [['settings', JSON.stringify(ns)]]);
+  const newKeys = {}; newPairs.forEach(p => { newKeys[p[0]] = true; });
+  const oldKeys = [].concat(categories.map(r => keyOf('category', r)), entries.map(r => keyOf('entry', r)), methods.map(r => keyOf('method', r)), partners.map(r => keyOf('partner', r))).filter(k => !newKeys[k]);
+  const prog = document.getElementById('progress-modal');
+  const msg = document.getElementById('progress-message');
+  prog.style.display = 'flex';
+  try {
+    if (oldKeys.length) { msg.textContent = '古いデータを整理しています…'; await sheetStorage.batch('deleteBatch', oldKeys); }
+    await sheetStorage.batch('setBatch', newPairs, (done, all) => { msg.textContent = done + ' / ' + all + ' 件'; });
+    categories = nc; entries = ne; methods = nm; partners = np; settings = ns;
+    sortMasters(); loadedOnce = true; saveToCache();
+    prog.style.display = 'none';
+    showSaveModal('復元しました(' + newPairs.length + '件)', true);
+  } catch (err) {
+    prog.style.display = 'none';
+    if (!err.unauthorized) showSaveModal('途中で失敗しました。通信状況を確認して、もう一度同じファイルで復元してください(何度やり直しても大丈夫です)', false);
+    await loadData();
+  }
+  renderAll();
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  if (!(await showConfirm('この端末からログアウトしますか？', 'ログアウト'))) return;
+  try { localStorage.removeItem(PASSWORD_STORAGE_KEY); if (!DEMO) localStorage.removeItem(CACHE_KEY); } catch (e) { /* ignore */ }
+  location.reload();
+});
+
+// ===== 印刷(A4 1枚にまとめる) =====
+const MM = 96 / 25.4; // 1mm あたりのピクセル
+function printReport(html, landscape) {
+  const pageW = (landscape ? 297 : 210) - 16, pageH = (landscape ? 210 : 297) - 16; // 余白8mmずつ
+  const wPx = Math.floor(pageW * MM), hPx = Math.floor(pageH * MM) - 4;
+  document.getElementById('page-style').textContent = '@page { size: A4 ' + (landscape ? 'landscape' : 'portrait') + '; margin: 8mm; }';
+  const area = document.getElementById('print-area');
+  area.innerHTML = `<div class="rp" style="display:inline-block; min-width:${wPx}px">${html}</div>`;
+  // 幅と高さを測って、はみ出す場合は縮小してA4 1枚に収める
+  area.style.cssText = 'display:block; position:absolute; left:-10000px; top:0;';
+  const rp = area.firstElementChild;
+  const w = rp.offsetWidth, h = rp.offsetHeight;
+  const scale = Math.min(1, wPx / w, hPx / h) * 0.98;
+  if (scale < 0.98) { rp.style.zoom = scale; }
+  area.style.cssText = '';
+  setTimeout(() => window.print(), 50);
+}
+window.addEventListener('afterprint', () => { document.getElementById('print-area').innerHTML = ''; });
+function rpBox(label, value, cls) { return `<div class="rp-box ${cls || ''}"><div class="l">${escapeHtml(label)}</div><div class="v">${value}</div></div>`; }
+function rpHead(title, sub) {
+  const t = todayStr().split('-').map(Number);
+  return `<div class="rp-head"><div class="rp-title">${escapeHtml(title)}</div><div class="rp-sub">${escapeHtml(sub)}<br>アクア農園　作成日 ${t[0]}年${t[1]}月${t[2]}日</div></div>`;
+}
+// 月の明細(A4縦)
+function printMonthList() {
+  const [from, to] = monthRange(lYear, lMonth);
+  const list = entriesBetween(from, to);
+  const t = tally(list);
+  let html = rpHead(lYear + '年' + lMonth + '月　収支明細', from.replace(/-/g, '/') + ' 〜 ' + to.replace(/-/g, '/'));
+  html += `<div class="rp-stats">${rpBox('収入', yen(t.income), 'inc')}${rpBox('支出', yen(t.expense), 'exp')}${rpBox('差引', yen(t.net), 'net')}${rpBox('件数', list.length + '件')}</div>`;
+  const mIds = usedMethods(t.byMethod);
+  if (list.length && (mIds.length > 1 || mIds[0])) html += `<div class="rp-stats">${mIds.map(id => rpBox(methodName(id), '入 ' + yen(t.byMethod[id].income) + ' / 出 ' + yen(t.byMethod[id].expense))).join('')}</div>`;
+  if (!list.length) html += '<div class="rp-note">この月の記録はありません</div>';
+  else html += `<table class="rp-table"><thead><tr><th>日付</th><th>区分</th><th>科目</th><th>支払い方法</th><th>取引先・お店</th><th>メモ</th><th class="num">収入</th><th class="num">支出</th></tr></thead><tbody>${
+    list.map(e => `<tr><td>${fmtMD(e.date)}</td><td>${typeLabel(e.type)}</td><td class="left">${escapeHtml(catName(e.categoryId))}</td><td>${e.methodId ? escapeHtml(methodName(e.methodId)) : ''}</td><td class="left">${escapeHtml(payeeOf(e))}</td><td class="left" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(e.memo || '')}</td><td class="num">${e.type === 'income' ? yen(entryAmount(e)) : ''}</td><td class="num">${e.type === 'expense' ? yen(entryAmount(e)) : ''}</td></tr>`).join('')
+  }</tbody><tfoot><tr class="total"><td colspan="6">合計</td><td class="num">${yen(t.income)}</td><td class="num">${yen(t.expense)}</td></tr></tfoot></table>`;
+  printReport(html, false);
+}
+// 月別集計(A4横)
+function printMonthly() {
+  const D = monthlyData(yFY);
+  const mLabel = m => parseInt(m.slice(5), 10) + '月';
+  let html = rpHead(fyTitle(yFY) + '　月別収支', '');
+  html += `<div class="rp-stats">${rpBox('年間の収入', yen(D.all.income), 'inc')}${rpBox('年間の支出', yen(D.all.expense), 'exp')}${rpBox('年間の差引', yen(D.all.net), 'net')}</div>`;
+  html += `<div class="rp-section">月ごとの収入と支出</div>` + barChart({ width: 1000, height: 170, labels: D.months.map(mLabel),
+    series: [{ name: '収入', color: '#3A9468', values: D.months.map(m => D.per[m].income) }, { name: '支出', color: '#D06A4F', values: D.months.map(m => D.per[m].expense) }] });
+  const row = (label, cls, get) => `<tr class="${cls}"><td>${escapeHtml(label)}</td>${D.months.map(m => { const v = get(D.per[m]); return `<td class="num ${v < 0 ? 'neg' : ''}">${v ? yen(v) : '-'}</td>`; }).join('')}<td class="num"><b>${get(D.all) ? yen(get(D.all)) : '-'}</b></td></tr>`;
+  const rows = [row('収入合計', 'strong', t => t.income)].concat(D.incIds.map(id => row(catName(id), 'sub', t => t.byCat[id] || 0)),
+    [row('支出合計', 'strong', t => t.expense)], D.expIds.map(id => row(catName(id), 'sub', t => t.byCat[id] || 0)), [row('差引', 'total', t => t.net)]);
+  html += `<div class="rp-section">月別集計</div><table class="rp-table"><thead><tr><th>科目</th>${D.months.map(m => `<th class="num">${mLabel(m)}</th>`).join('')}<th class="num">年計</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  printReport(html, true);
+}
+// 確定申告用(A4縦)
+function printTax() {
+  const { from, to } = fyRange(yFY);
+  const T = taxLines(entriesBetween(from, to));
+  let html = rpHead(fyTitle(yFY) + '　確定申告用 集計', '青色申告決算書(農業所得用)の科目ごと');
+  html += `<div class="rp-stats">${rpBox('収入金額', yen(T.incTotal), 'inc')}${rpBox('経費', yen(T.expTotal), 'exp')}${rpBox('差引(所得の目安)', yen(T.net), 'net')}</div>`;
+  const line = g => `<tr class="sub"><td>${escapeHtml(g.line)}</td><td class="num">${yen(g.total)}</td><td class="num">${yen(g.biz)}</td><td class="left">${escapeHtml(g.notes.join('、'))}</td></tr>`;
+  html += `<table class="rp-table"><thead><tr><th>決算書の科目</th><th class="num">帳簿の合計</th><th class="num">申告に使う額</th><th>内訳・按分</th></tr></thead><tbody>
+    <tr class="strong"><td>収入金額</td><td class="num">${yen(T.bookIncome)}</td><td class="num">${yen(T.incTotal)}</td><td></td></tr>${T.inc.map(line).join('')}
+    <tr class="strong"><td>経費</td><td class="num">${yen(T.bookExpense)}</td><td class="num">${yen(T.expTotal)}</td><td></td></tr>${T.exp.map(line).join('')}
+    <tr class="total"><td>差引(所得の目安)</td><td></td><td class="num">${yen(T.net)}</td><td class="left">控除前</td></tr></tbody></table>`;
+  html += `<div class="rp-note">帳簿の合計を決算書の科目ごとにまとめたものです。減価償却費・棚卸(年末の在庫)・青色申告特別控除などは別途計算してください。</div>`;
+  printReport(html, false);
+}
+document.getElementById('l-print').addEventListener('click', printMonthList);
+document.getElementById('y-print').addEventListener('click', () => { if (aView === 'tax') printTax(); else printMonthly(); });
+
+// ===== 起動 =====
+document.getElementById('refresh-data-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('refresh-data-btn');
+  btn.classList.add('is-loading'); btn.textContent = '↻ 更新中…';
+  const ok = await loadData();
+  renderAll();
+  btn.classList.remove('is-loading'); btn.textContent = '↻ 最新に更新';
+  if (ok) showToast('最新の内容に更新しました');
+});
+
+(async function init() {
+  document.getElementById('e-date').value = todayStr();
+  if (DEMO) document.getElementById('demo-banner').style.display = 'block';
+  if (loadFromCache()) { yFY = fiscalYearOf(todayStr()); renderAll(); } // まず前回のデータですぐ表示
+  if (!DEMO && !getStoredPassword()) return; // 合言葉の入力待ち
+  const ok = await loadData();               // 裏で最新を取得して更新
+  // はじめて使うとき(科目がひとつもない)は、おすすめの科目と支払い方法を自動で入れる
+  if (ok && categories.length === 0) await createDefaults(false);
+  yFY = fiscalYearOf(todayStr());
+  renderAll();
+})();
+</script>
+</body>
+</html>
