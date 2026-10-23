@@ -36,7 +36,9 @@
   .app-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   .app-header h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
   .app-header p { margin: 0; color: var(--text-secondary); font-size: 13px; }
-  #refresh-data-btn { flex-shrink: 0; white-space: nowrap; }
+  .header-btns { display: flex; gap: 8px; flex-shrink: 0; }
+  #refresh-data-btn, #top-link { flex-shrink: 0; white-space: nowrap; }
+  #top-link { text-decoration: none; display: inline-flex; align-items: center; }
   #refresh-data-btn.is-loading { opacity: 0.6; pointer-events: none; }
   .demo-banner { background: var(--gold-light); color: #6B4A0F; border: 1px solid #E5CFA4; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 14px; display: none; }
 
@@ -220,7 +222,7 @@
   @media (max-width: 600px) {
     .app { padding: 16px 12px 40px; }
     .app-header { flex-direction: column; align-items: stretch; }
-    #refresh-data-btn { align-self: flex-start; }
+    .header-btns { align-self: flex-start; }
     .card { padding: 14px; }
     .tab-btn { padding: 10px 10px; font-size: 14px; }
     .seg-btn { padding: 8px 14px; }
@@ -245,7 +247,10 @@
       <h1>アクア農園 収支管理</h1>
       <p>農園のお金の出入りを記録し、確定申告用の集計まで出します</p>
     </div>
-    <button type="button" class="btn-ghost" id="refresh-data-btn">↻ 最新に更新</button>
+    <div class="header-btns">
+      <a class="btn-ghost" id="top-link" href="https://yakyuuhatomodachi-droid.github.io/">⌂ トップへ</a>
+      <button type="button" class="btn-ghost" id="refresh-data-btn">↻ 最新に更新</button>
+    </div>
   </div>
   <div class="demo-banner" id="demo-banner">お試しモードです。データはこの端末の中だけに保存されます(スプレッドシートにつなぐと本番になります)。</div>
 
